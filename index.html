@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SCRAP QUOTA: MULTIPLAYER</title>
+    <title>SCRAP QUOTA: SYNCED MULTIPLAYER</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
         
@@ -31,8 +31,7 @@
 
         .hidden { display: none !important; }
         #loading-msg { color: yellow; font-size: 18px; margin-top: 15px; display:none; animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0; } }
-
+        
         #energy-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 12; pointer-events: none; display: none; background: radial-gradient(circle, rgba(0,0,0,0) 0%, rgba(0,100,255,0.4) 100%); animation: pulse 1s infinite alternate; }
         @keyframes pulse {
             from { transform: scale(1); background: radial-gradient(circle, rgba(0,0,0,0) 0%, rgba(0,100,255,0.4) 100%); }
@@ -91,11 +90,11 @@
             <input type="text" id="join-id-input" placeholder="Enter Host ID">
             <button id="join-btn" style="margin:0; padding: 5px 15px; font-size: 20px;">JOIN</button>
         </div>
-        <div id="my-id">Status: Offline</div>
+        <div id="my-id">Status: Singleplayer</div>
     </div>
 
     <div id="loading-msg">LOADING ASSETS...</div>
-    <button id="start-btn">LAND SHIP</button>
+    <button id="start-btn" disabled>LOADING...</button>
     <div style="margin-top: 30px; font-size: 18px; color: #888;">[WASD] MOVE • [SHIFT] SPRINT • [E] INTERACT • [G] DROP • [F] USE ITEM</div>
 </div>
 
@@ -103,7 +102,22 @@
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+    // ==========================================
+    // 0. SEEDED RANDOM (For Map Sync)
+    // ==========================================
+    class SeededRNG {
+        constructor(seed) { this.seed = seed; }
+        next() {
+            var t = this.seed += 0x6D2B79F5;
+            t = Math.imul(t ^ t >>> 15, t | 1);
+            t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        }
+    }
+
+    // ==========================================
     // 1. CONFIGURATION
+    // ==========================================
     const MODELS = {
         scrapFiles: [ 'trash_1.glb', 'trash_2.glb' ],
         enemy: 'Monster.glb',
@@ -113,23 +127,29 @@
     const MODEL_SCALE = 1.0;
     
     const GAME_CONFIG = { tileSize: 10, mapSize: 40, wallHeight: 12, snowCount: 6000 };
-    const gameState = { inMenu: true, money: 0, quota: 130, days: 3, time: 8 * 60, gameOver: false };
+    const gameState = { inMenu: true, money: 0, quota: 130, days: 3, time: 8 * 60, gameOver: false, isHost: false, seed: Date.now() };
     const player = { speed: 8.0, runSpeed: 15.0, velocity: new THREE.Vector3(), stamina: 100, inventory: [], weight: 0, maxSlots: 4, hasEnergyDrink: false };
     const energyEffect = { active: false, timer: 0, bonusWorldTimer: 0, music: null };
 
-    // Network
+    // Network State
     let peer = null;
-    let conn = null;
+    let conn = null; // Client's connection to Host
+    let clients = []; // Host's list of connections
     let myPeerId = null;
     let remotePlayers = {}; // { id: Mesh }
+    let netObjects = {}; // { netId: Mesh } - Registry of all syncable objects
+    let collectedIds = new Set(); // Track items removed so late joiners don't see them
 
     let walls = [], scraps = [], enemies = [], mines = [], bonusScraps = [], energyDrinkObject;
     let worldObjects = new THREE.Group(); 
     let shipZone = new THREE.Box3();
     let leverMesh;
     let snowSystem, sparkleSystem;
+    let rng = new SeededRNG(gameState.seed);
 
+    // ==========================================
     // 2. ENGINE SETUP
+    // ==========================================
     const scene = new THREE.Scene();
     const defaultBgColor = new THREE.Color(0x020205);
     scene.background = defaultBgColor;
@@ -174,7 +194,299 @@
     let moveF = false, moveB = false, moveL = false, moveR = false, sprint = false;
     const raycaster = new THREE.Raycaster(); const center = new THREE.Vector2(0, 0);
 
-    // 3. EFFECTS (Snow & Sparkles)
+    // ==========================================
+    // 3. ASSET LOADING
+    // ==========================================
+    const loadedAssets = { scraps: [], enemy: null, player: null, energy: null };
+    const gltfLoader = new GLTFLoader();
+    const audioLoader = new THREE.AudioLoader();
+
+    function loadAssets() {
+        const status = document.getElementById('loading-msg');
+        const startBtn = document.getElementById('start-btn');
+        
+        const safeLoadGLTF = (url, onSuccess) => new Promise(resolve => gltfLoader.load(url, (g)=>{onSuccess(g);resolve();}, undefined, ()=>{console.warn("Missing:",url);resolve();}));
+        const promises = [];
+
+        MODELS.scrapFiles.forEach(url => promises.push(safeLoadGLTF(url, g => {
+            g.scene.traverse(c=>{if(c.isMesh)c.material.map=scrapTexture;}); loadedAssets.scraps.push(g.scene);
+        })));
+        if(MODELS.enemy) promises.push(safeLoadGLTF(MODELS.enemy, g => loadedAssets.enemy = g.scene));
+        if(MODELS.player) promises.push(safeLoadGLTF(MODELS.player, g => loadedAssets.player = g.scene));
+        if(MODELS.energy) promises.push(safeLoadGLTF(MODELS.energy, g => {
+            g.scene.traverse(c=>{if(c.isMesh)c.material.map=energyTexture;}); loadedAssets.energy = g.scene;
+        }));
+        promises.push(new Promise(r => audioLoader.load('Energy_Music.mp3', b=>{energyMusicBuffer=b;r();}, undefined, r)));
+
+        Promise.all(promises).then(() => {
+            status.style.display = 'none';
+            startBtn.disabled = false;
+            startBtn.innerText = "LAND SHIP";
+        });
+    }
+    loadAssets();
+
+    // ==========================================
+    // 4. MULTIPLAYER NETWORKING
+    // ==========================================
+    
+    // --- HOST LOGIC ---
+    document.getElementById('host-btn').addEventListener('click', () => {
+        gameState.isHost = true;
+        gameState.seed = Date.now(); // Host decides the seed
+        
+        peer = new Peer();
+        peer.on('open', (id) => {
+            myPeerId = id;
+            document.getElementById('my-id').innerText = `HOST ID: ${id}`;
+            document.getElementById('my-id').style.color = '#33ff00';
+            document.getElementById('host-btn').disabled = true;
+            document.getElementById('join-btn').disabled = true;
+        });
+
+        peer.on('connection', (connection) => {
+            clients.push(connection);
+            
+            // Send Game State to new client immediately
+            connection.on('open', () => {
+                connection.send({
+                    type: 'init',
+                    seed: gameState.seed,
+                    collectedIds: Array.from(collectedIds),
+                    money: gameState.money,
+                    quota: gameState.quota,
+                    days: gameState.days
+                });
+            });
+
+            connection.on('data', handleDataFromClient);
+            notify("PLAYER JOINED", false);
+        });
+    });
+
+    // --- CLIENT LOGIC ---
+    document.getElementById('join-btn').addEventListener('click', () => {
+        const id = document.getElementById('join-id-input').value;
+        if(!id) return;
+        
+        gameState.isHost = false;
+        peer = new Peer();
+        peer.on('open', () => {
+            conn = peer.connect(id);
+            conn.on('open', () => {
+                document.getElementById('my-id').innerText = "Status: CONNECTED";
+                document.getElementById('host-btn').disabled = true;
+                document.getElementById('join-btn').disabled = true;
+                notify("Connected to Host. Syncing...", false);
+            });
+            conn.on('data', handleDataFromHost);
+        });
+    });
+
+    // --- PACKET HANDLING ---
+    
+    // Host handles data from Clients
+    function handleDataFromClient(data) {
+        // Relay movement to other clients
+        if (data.type === 'pos') {
+            updateRemotePlayer(data);
+            // Broadcast to other clients (except sender)
+            clients.forEach(c => { if(c.peer !== data.id) c.send(data); });
+        }
+        // Client requesting item pickup
+        if (data.type === 'request_pickup') {
+            if (!collectedIds.has(data.netId)) {
+                // Valid pickup
+                collectedIds.add(data.netId);
+                // Tell everyone to remove it
+                const msg = { type: 'remove_item', netId: data.netId };
+                clients.forEach(c => c.send(msg)); // To clients
+                handleRemoveItem(data.netId); // Locally on Host
+            }
+        }
+    }
+
+    // Client handles data from Host
+    function handleDataFromHost(data) {
+        if (data.type === 'init') {
+            gameState.seed = data.seed;
+            gameState.money = data.money;
+            gameState.quota = data.quota;
+            gameState.days = data.days;
+            // Pre-fill collected IDs
+            data.collectedIds.forEach(id => collectedIds.add(id));
+            notify("WORLD SYNCED", false);
+        }
+        if (data.type === 'pos') {
+            updateRemotePlayer(data);
+        }
+        if (data.type === 'remove_item') {
+            handleRemoveItem(data.netId);
+        }
+        if (data.type === 'game_state') {
+            gameState.time = data.time;
+            document.getElementById('hud-time').innerText = formatTime(gameState.time);
+        }
+    }
+
+    // Common Logic
+    function handleRemoveItem(netId) {
+        collectedIds.add(netId);
+        const obj = netObjects[netId];
+        if (obj) {
+            // Remove from Scene
+            if (obj.parent) obj.parent.remove(obj);
+            // Remove from lists
+            scraps = scraps.filter(s => s !== obj);
+            bonusScraps = bonusScraps.filter(s => s !== obj);
+            if (energyDrinkObject === obj) energyDrinkObject = null;
+            delete netObjects[netId];
+        }
+    }
+
+    function updateNetworkLoop() {
+        const myData = {
+            type: 'pos',
+            id: myPeerId || 'client',
+            x: camera.position.x,
+            y: camera.position.y - 4,
+            z: camera.position.z,
+            ry: camera.rotation.y
+        };
+
+        if (gameState.isHost) {
+            // Broadcast Host position to all clients
+            clients.forEach(c => c.send(myData));
+            
+            // Broadcast Game Time
+            clients.forEach(c => c.send({ type: 'game_state', time: gameState.time }));
+        } else if (conn && conn.open) {
+            // Send Client position to Host
+            conn.send(myData);
+        }
+    }
+
+    function updateRemotePlayer(data) {
+        if (!remotePlayers[data.id]) {
+            let mesh;
+            if (loadedAssets.player) {
+                mesh = loadedAssets.player.clone();
+                mesh.scale.set(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+            } else {
+                mesh = new THREE.Mesh(new THREE.CapsuleGeometry(1, 4, 4), new THREE.MeshBasicMaterial({color: 0x00ff00}));
+            }
+            scene.add(mesh);
+            remotePlayers[data.id] = mesh;
+        }
+        const p = remotePlayers[data.id];
+        p.position.lerp(new THREE.Vector3(data.x, data.y, data.z), 0.5); // Smooth
+        p.rotation.y = data.ry + Math.PI;
+    }
+
+    // ==========================================
+    // 5. LEVEL GENERATION (SEEDED)
+    // ==========================================
+    function resetLevel() {
+        worldObjects.clear();
+        scraps = []; enemies = []; mines = []; bonusScraps = []; energyDrinkObject = null;
+        netObjects = {}; // Clear ID registry
+        
+        // Re-init RNG with the shared seed
+        rng = new SeededRNG(gameState.seed);
+
+        createEffects();
+
+        const mapW = GAME_CONFIG.mapSize * GAME_CONFIG.tileSize;
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(mapW, mapW), matFloor);
+        floor.rotation.x = -Math.PI / 2; floor.name = "FLOOR"; worldObjects.add(floor);
+
+        const shipX = Math.floor(GAME_CONFIG.mapSize/2), shipZ = Math.floor(GAME_CONFIG.mapSize/2), range = 3; 
+        const shipFloor = new THREE.Mesh(new THREE.PlaneGeometry(range*2*GAME_CONFIG.tileSize, range*2*GAME_CONFIG.tileSize), matShip);
+        shipFloor.rotation.x = -Math.PI/2; shipFloor.position.set(0,0.1,0); worldObjects.add(shipFloor);
+        shipZone.setFromObject(shipFloor); shipZone.max.y = 15;
+
+        const boxGeo = new THREE.BoxGeometry(GAME_CONFIG.tileSize, GAME_CONFIG.wallHeight, GAME_CONFIG.tileSize);
+        for (let x=0; x < GAME_CONFIG.mapSize; x++) for (let z=0; z < GAME_CONFIG.mapSize; z++) {
+            let isWall = (x === 0 || x === GAME_CONFIG.mapSize-1 || z === 0 || z === GAME_CONFIG.mapSize-1 || rng.next() < 0.12);
+            if (x > shipX-range && x < shipX+range && z > shipZ-range && z < shipZ+range) isWall = false;
+            if (isWall) {
+                const wall = new THREE.Mesh(boxGeo, matWall);
+                wall.position.set((x-GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize, GAME_CONFIG.wallHeight/2, (z-GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize);
+                worldObjects.add(wall); walls.push(new THREE.Box3().setFromObject(wall));
+            }
+        }
+        
+        leverMesh = new THREE.Mesh(new THREE.BoxGeometry(2,4,2), matLever);
+        leverMesh.position.set((shipX-range+1-GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize, 2, (shipZ-GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize);
+        leverMesh.userData = { type: 'lever' }; worldObjects.add(leverMesh);
+
+        // Spawn Objects with IDs
+        spawnGroup(20, 'scrap');
+        spawnGroup(2 + Math.floor(gameState.days*0.5), 'enemy');
+        spawnGroup(10, 'mine');
+        spawnGroup(1, 'energy_drink');
+
+        // Remove things that were already collected (for late joiners)
+        collectedIds.forEach(id => {
+            if(netObjects[id]) {
+                const obj = netObjects[id];
+                if(obj.parent) obj.parent.remove(obj);
+                delete netObjects[id];
+                // Cleanup arrays
+                scraps = scraps.filter(s => s !== obj);
+                bonusScraps = bonusScraps.filter(s => s !== obj);
+            }
+        });
+
+        camera.position.set(0, 5, 0); camera.rotation.set(0,0,0);
+        updateHUD();
+    }
+    
+    function spawnGroup(count, type) {
+        let spawned = 0;
+        while(spawned < count) {
+            let rx = (rng.next()*GAME_CONFIG.mapSize - GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize;
+            let rz = (rng.next()*GAME_CONFIG.mapSize - GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize;
+            if (Math.abs(rx) > 20 && Math.abs(rz) > 20) {
+                const netId = `${type}_${spawned}_${Math.floor(rx)}_${Math.floor(rz)}`; // Deterministic ID
+                if(type === 'scrap') spawnScrap({value: Math.floor(30+rng.next()*70), weight: Math.floor(5+rng.next()*15)}, new THREE.Vector3(rx, 1, rz), false, netId);
+                if(type === 'enemy') spawnEnemy(new THREE.Vector3(rx, 3, rz));
+                if(type === 'mine') spawnMine(new THREE.Vector3(rx, 0.2, rz));
+                if(type === 'energy_drink') spawnEnergyDrink(new THREE.Vector3(rx, 1.5, rz), netId);
+                spawned++;
+            }
+        }
+    }
+
+    function spawnScrap(data, pos, isBonus = false, netId) {
+        let mesh;
+        let mIndex = Math.floor(rng.next() * loadedAssets.scraps.length);
+        if(loadedAssets.scraps[mIndex]) mesh = loadedAssets.scraps[mIndex].clone();
+        else mesh = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), new THREE.MeshStandardMaterial({map: scrapTexture}));
+        mesh.scale.set(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+        mesh.position.copy(pos); 
+        mesh.userData = { type: 'scrap', ...data, netId: netId };
+        
+        if (isBonus) { bonusScraps.push(mesh); } 
+        else { scraps.push(mesh); worldObjects.add(mesh); }
+        
+        if(netId) netObjects[netId] = mesh;
+    }
+
+    function spawnEnemy(pos) { let mesh; if(loadedAssets.enemy){mesh=loadedAssets.enemy.clone();mesh.scale.set(MODEL_SCALE,MODEL_SCALE,MODEL_SCALE);}else{mesh=new THREE.Mesh(new THREE.CylinderGeometry(2,2,6,8),new THREE.MeshStandardMaterial({color:0xaa0000}));} mesh.position.copy(pos);mesh.userData={speed:5+rng.next()*3};worldObjects.add(mesh);enemies.push(mesh); }
+    function spawnMine(pos) { const g=new THREE.Group();const b=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,0.4,16),matMineBase);const l=new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8),new THREE.MeshBasicMaterial({color:0xff0000}));l.position.y=0.3;g.add(b);g.add(l);g.position.copy(pos);g.userData={type:'mine',lightMesh:l,pulseTimer:rng.next()*10};worldObjects.add(g);mines.push(g); }
+    function spawnEnergyDrink(pos, netId) {
+        let mesh;
+        if (loadedAssets.energy) mesh = loadedAssets.energy.clone();
+        else mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1, 16), new THREE.MeshBasicMaterial({color: 0x0000ff})); 
+        mesh.position.copy(pos); mesh.userData = { type: 'energy_drink', netId: netId };
+        energyDrinkObject = mesh; worldObjects.add(mesh);
+        if(netId) netObjects[netId] = mesh;
+    }
+
+    // ==========================================
+    // 6. VISUAL EFFECTS
+    // ==========================================
     function createEffects() {
         // Snow
         const snowGeo = new THREE.BufferGeometry();
@@ -201,13 +513,11 @@
     }
     
     function updateEffects(delta) {
-        // Snow
         if (snowSystem) {
             const pos = snowSystem.geometry.attributes.position.array;
             for (let i = 1; i < pos.length; i += 3) { pos[i] -= 0.15; if (pos[i] < 0) pos[i] = 50; }
             snowSystem.geometry.attributes.position.needsUpdate = true;
         }
-        // Sparkles
         if (sparkleSystem && energyEffect.active) {
             sparkleSystem.material.opacity = Math.min(1, sparkleSystem.material.opacity + delta);
             const pos = sparkleSystem.geometry.attributes.position.array;
@@ -222,178 +532,11 @@
         }
     }
 
-    // 4. ASSET LOADING
-    const loadedAssets = { scraps: [], enemy: null, player: null, energy: null };
-    const gltfLoader = new GLTFLoader();
-    const audioLoader = new THREE.AudioLoader();
-
-    function loadAssets() {
-        const status = document.getElementById('loading-msg');
-        const startBtn = document.getElementById('start-btn');
-        startBtn.disabled = true;
-        
-        const safeLoadGLTF = (url, onSuccess) => new Promise(resolve => gltfLoader.load(url, (g)=>{onSuccess(g);resolve();}, undefined, ()=>{console.warn("Missing:",url);resolve();}));
-        const promises = [];
-
-        MODELS.scrapFiles.forEach(url => promises.push(safeLoadGLTF(url, g => {
-            g.scene.traverse(c=>{if(c.isMesh)c.material.map=scrapTexture;}); loadedAssets.scraps.push(g.scene);
-        })));
-        if(MODELS.enemy) promises.push(safeLoadGLTF(MODELS.enemy, g => loadedAssets.enemy = g.scene));
-        if(MODELS.player) promises.push(safeLoadGLTF(MODELS.player, g => loadedAssets.player = g.scene));
-        if(MODELS.energy) promises.push(safeLoadGLTF(MODELS.energy, g => {
-            g.scene.traverse(c=>{if(c.isMesh)c.material.map=energyTexture;}); loadedAssets.energy = g.scene;
-        }));
-        promises.push(new Promise(r => audioLoader.load('Energy_Music.mp3', b=>{energyMusicBuffer=b;r();}, undefined, r)));
-
-        Promise.all(promises).then(() => {
-            status.style.display = 'none';
-            startBtn.disabled = false;
-        });
-    }
-    loadAssets();
-
-    // 5. MULTIPLAYER LOGIC
-    document.getElementById('host-btn').addEventListener('click', () => {
-        peer = new Peer();
-        peer.on('open', (id) => {
-            myPeerId = id;
-            document.getElementById('my-id').innerText = `ID: ${id} (Waiting...)`;
-            document.getElementById('my-id').style.color = '#33ff00';
-        });
-        peer.on('connection', (c) => {
-            conn = c;
-            setupConnection();
-            alert("Player Joined!");
-        });
-    });
-
-    document.getElementById('join-btn').addEventListener('click', () => {
-        const id = document.getElementById('join-id-input').value;
-        if(!id) return;
-        peer = new Peer();
-        peer.on('open', () => {
-            conn = peer.connect(id);
-            setupConnection();
-        });
-    });
-
-    function setupConnection() {
-        conn.on('data', (data) => {
-            // Data Format: { type: 'pos', id: 'uuid', x, y, z, ry }
-            if (data.type === 'pos') {
-                updateRemotePlayer(data);
-            }
-        });
-        document.getElementById('my-id').innerText = "Status: CONNECTED";
-    }
-
-    function updateNetwork() {
-        if (conn && conn.open) {
-            conn.send({
-                type: 'pos',
-                id: myPeerId || 'client',
-                x: camera.position.x,
-                y: camera.position.y - 4, // Model offset
-                z: camera.position.z,
-                ry: camera.rotation.y
-            });
-        }
-    }
-
-    function updateRemotePlayer(data) {
-        if (!remotePlayers[data.id]) {
-            // Spawn new player model
-            let mesh;
-            if (loadedAssets.player) {
-                mesh = loadedAssets.player.clone();
-                mesh.scale.set(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
-            } else {
-                mesh = new THREE.Mesh(new THREE.CapsuleGeometry(1, 4, 4), new THREE.MeshBasicMaterial({color: 0x00ff00}));
-            }
-            scene.add(mesh);
-            remotePlayers[data.id] = mesh;
-        }
-        const p = remotePlayers[data.id];
-        p.position.set(data.x, data.y, data.z);
-        p.rotation.y = data.ry + Math.PI; // Adjust GLTF rotation
-    }
-
-    // 6. LEVEL GENERATION
-    function resetLevel() {
-        worldObjects.clear();
-        scraps = []; enemies = []; mines = []; bonusScraps = []; energyDrinkObject = null;
-        player.inventory = []; player.weight = 0; player.hasEnergyDrink = false;
-        
-        createEffects();
-
-        const mapW = GAME_CONFIG.mapSize * GAME_CONFIG.tileSize;
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(mapW, mapW), matFloor);
-        floor.rotation.x = -Math.PI / 2; floor.name = "FLOOR"; worldObjects.add(floor);
-
-        const shipX = Math.floor(GAME_CONFIG.mapSize/2), shipZ = Math.floor(GAME_CONFIG.mapSize/2), range = 3; 
-        const shipFloor = new THREE.Mesh(new THREE.PlaneGeometry(range*2*GAME_CONFIG.tileSize, range*2*GAME_CONFIG.tileSize), matShip);
-        shipFloor.rotation.x = -Math.PI/2; shipFloor.position.set(0,0.1,0); worldObjects.add(shipFloor);
-        shipZone.setFromObject(shipFloor); shipZone.max.y = 15;
-
-        const boxGeo = new THREE.BoxGeometry(GAME_CONFIG.tileSize, GAME_CONFIG.wallHeight, GAME_CONFIG.tileSize);
-        for (let x=0; x < GAME_CONFIG.mapSize; x++) for (let z=0; z < GAME_CONFIG.mapSize; z++) {
-            let isWall = (x === 0 || x === GAME_CONFIG.mapSize-1 || z === 0 || z === GAME_CONFIG.mapSize-1 || Math.random() < 0.12);
-            if (x > shipX-range && x < shipX+range && z > shipZ-range && z < shipZ+range) isWall = false;
-            if (isWall) {
-                const wall = new THREE.Mesh(boxGeo, matWall);
-                wall.position.set((x-GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize, GAME_CONFIG.wallHeight/2, (z-GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize);
-                worldObjects.add(wall); walls.push(new THREE.Box3().setFromObject(wall));
-            }
-        }
-        
-        leverMesh = new THREE.Mesh(new THREE.BoxGeometry(2,4,2), matLever);
-        leverMesh.position.set((shipX-range+1-GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize, 2, (shipZ-GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize);
-        leverMesh.userData = { type: 'lever' }; worldObjects.add(leverMesh);
-
-        spawnGroup(20, 'scrap');
-        spawnGroup(2 + Math.floor(gameState.days*0.5), 'enemy');
-        spawnGroup(10, 'mine');
-        spawnGroup(1, 'energy_drink');
-
-        camera.position.set(0, 5, 0); camera.rotation.set(0,0,0);
-    }
-    
-    function spawnGroup(count, type) {
-        let spawned = 0;
-        while(spawned < count) {
-            let rx = (Math.random()*GAME_CONFIG.mapSize - GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize;
-            let rz = (Math.random()*GAME_CONFIG.mapSize - GAME_CONFIG.mapSize/2)*GAME_CONFIG.tileSize;
-            if (Math.abs(rx) > 20 && Math.abs(rz) > 20) {
-                if(type === 'scrap') spawnScrap({value: Math.floor(30+Math.random()*70), weight: Math.floor(5+Math.random()*15)}, new THREE.Vector3(rx, 1, rz));
-                if(type === 'enemy') spawnEnemy(new THREE.Vector3(rx, 3, rz));
-                if(type === 'mine') spawnMine(new THREE.Vector3(rx, 0.2, rz));
-                if(type === 'energy_drink') spawnEnergyDrink(new THREE.Vector3(rx, 1.5, rz));
-                spawned++;
-            }
-        }
-    }
-
-    function spawnScrap(data, pos, isBonus = false) {
-        let mesh;
-        let mIndex = Math.floor(Math.random() * loadedAssets.scraps.length);
-        if(loadedAssets.scraps[mIndex]) mesh = loadedAssets.scraps[mIndex].clone();
-        else mesh = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), new THREE.MeshStandardMaterial({map: scrapTexture}));
-        mesh.scale.set(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
-        mesh.position.copy(pos); mesh.userData = { type: 'scrap', ...data };
-        if (isBonus) { bonusScraps.push(mesh); } else { scraps.push(mesh); worldObjects.add(mesh); }
-    }
-    function spawnEnemy(pos) { let mesh; if(loadedAssets.enemy){mesh=loadedAssets.enemy.clone();mesh.scale.set(MODEL_SCALE,MODEL_SCALE,MODEL_SCALE);}else{mesh=new THREE.Mesh(new THREE.CylinderGeometry(2,2,6,8),new THREE.MeshStandardMaterial({color:0xaa0000}));} mesh.position.copy(pos);mesh.userData={speed:5+Math.random()*3};worldObjects.add(mesh);enemies.push(mesh); }
-    function spawnMine(pos) { const g=new THREE.Group();const b=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,0.4,16),matMineBase);const l=new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8),new THREE.MeshBasicMaterial({color:0xff0000}));l.position.y=0.3;g.add(b);g.add(l);g.position.copy(pos);g.userData={type:'mine',lightMesh:l,pulseTimer:Math.random()*10};worldObjects.add(g);mines.push(g); }
-    function spawnEnergyDrink(pos) {
-        let mesh;
-        if (loadedAssets.energy) mesh = loadedAssets.energy.clone();
-        else mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1, 16), new THREE.MeshBasicMaterial({color: 0x0000ff})); 
-        mesh.position.copy(pos); mesh.userData = { type: 'energy_drink' };
-        energyDrinkObject = mesh; worldObjects.add(mesh);
-    }
-    
-    // 7. INPUT
-    document.getElementById('start-btn').addEventListener('click', () => {
+    // ==========================================
+    // 7. INPUT & INTERACTION
+    // ==========================================
+    const startBtn = document.getElementById('start-btn');
+    startBtn.addEventListener('click', () => {
         if (audioCtx.state === 'suspended') audioCtx.resume();
         if(gameState.inMenu) {
             gameState.inMenu = false;
@@ -420,36 +563,56 @@
         if(gameState.inMenu) return;
         raycaster.setFromCamera(center, camera);
         
-        // INTERACTION FIX: Check both normal objects OR bonus scraps depending on state
-        let objectsToCheck = worldObjects.children;
-        if (energyEffect.active && energyEffect.bonusWorldTimer > 0) {
-            objectsToCheck = bonusScraps; // Only check bonus items in trip
-        }
-
+        let objectsToCheck = energyEffect.active ? bonusScraps : worldObjects.children;
         const intersects = raycaster.intersectObjects(objectsToCheck, true);
+        
         for (let i = 0; i < intersects.length; i++) {
             if (intersects[i].distance > 15) break;
             let obj = intersects[i].object;
-            // Traverse up to find user data
             while(obj.parent && obj.parent !== worldObjects && obj.parent !== scene && !obj.userData.type) { obj = obj.parent; }
 
             if (obj.userData.type === 'scrap') {
                 if (player.inventory.length >= player.maxSlots) { notify("INVENTORY FULL", true); return; }
-                player.inventory.push(obj.userData); player.weight += obj.userData.weight;
                 
-                if (energyEffect.active) {
-                    scene.remove(obj); // Remove from scene (bonus item)
-                    bonusScraps = bonusScraps.filter(s => s !== obj);
+                // --- NETWORKED PICKUP ---
+                if (gameState.isHost) {
+                    // I am Host, remove immediately and broadcast
+                    player.inventory.push(obj.userData); player.weight += obj.userData.weight;
+                    if(obj.userData.netId) {
+                        handleRemoveItem(obj.userData.netId);
+                        clients.forEach(c => c.send({type: 'remove_item', netId: obj.userData.netId}));
+                    } else {
+                        // Bonus scraps in trip might not be synced same way, handle locally
+                         if (energyEffect.active) { scene.remove(obj); bonusScraps = bonusScraps.filter(s => s !== obj); }
+                    }
+                    updateHUD(); 
                 } else {
-                    obj.parent.remove(obj); // Remove from worldObjects
-                    scraps = scraps.filter(s => s !== obj);
+                    // I am Client, request pickup
+                    if (obj.userData.netId) {
+                        player.inventory.push(obj.userData); player.weight += obj.userData.weight;
+                        conn.send({ type: 'request_pickup', netId: obj.userData.netId });
+                        // Optimistically remove locally? Better wait for server conf, but for lag handling we hide it
+                        obj.visible = false; 
+                        updateHUD();
+                    } else if (energyEffect.active) {
+                         // Client trip items are local only
+                         player.inventory.push(obj.userData); player.weight += obj.userData.weight;
+                         scene.remove(obj); bonusScraps = bonusScraps.filter(s => s !== obj);
+                         updateHUD();
+                    }
                 }
-                updateHUD(); return;
+                return;
             } 
             else if (obj.userData.type === 'energy_drink') {
                 if (player.hasEnergyDrink) { notify("ALREADY HOLDING ONE", true); return; }
                 player.hasEnergyDrink = true;
-                worldObjects.remove(obj); energyDrinkObject = null;
+                 if (gameState.isHost) {
+                    handleRemoveItem(obj.userData.netId);
+                    clients.forEach(c => c.send({type: 'remove_item', netId: obj.userData.netId}));
+                 } else {
+                    conn.send({ type: 'request_pickup', netId: obj.userData.netId });
+                    obj.visible = false;
+                 }
                 updateHUD(); return;
             }
             else if (obj.userData.type === 'lever') { endDay(false); return; }
@@ -479,7 +642,6 @@
         scene.background = bonusBgTexture;
         worldObjects.visible = false; 
         
-        // Hide remote players in trip (optional, but cleaner)
         Object.values(remotePlayers).forEach(p => p.visible = false);
 
         let floor = scene.getObjectByName("FLOOR"); if(floor) floor.material = matBonusFloor;
@@ -490,7 +652,7 @@
             const pos = new THREE.Vector3(Math.cos(angle) * dist, 1, Math.sin(angle) * dist).add(camera.position);
             spawnScrap({ name: "Hyperian Crystal", value: 150 + Math.floor(Math.random()*100), weight: 2.5 }, pos, true);
         }
-        bonusScraps.forEach(s => scene.add(s)); // Add directly to scene
+        bonusScraps.forEach(s => scene.add(s)); 
         energyEffect.bonusWorldTimer = 60;
         document.getElementById('bonus-timer').style.display = 'block';
     }
@@ -502,7 +664,6 @@
         document.getElementById('energy-overlay').style.display = 'none';
         document.getElementById('bonus-timer').style.display = 'none';
         
-        // Show remote players again
         Object.values(remotePlayers).forEach(p => p.visible = true);
 
         scene.background = defaultBgColor;
@@ -516,18 +677,21 @@
     
     // 9. GAME LOOP
     const clock = new THREE.Clock();
-    let networkTimer = 0;
-
+    
     function update() {
         if (gameState.inMenu || gameState.gameOver) return;
         const delta = clock.getDelta();
         if (document.pointerLockElement !== document.body) return;
 
         updateEffects(delta);
-        updateNetwork();
+        
+        // Network Sync Rate
+        updateNetworkLoop();
 
-        gameState.time += delta * 15;
-        document.getElementById('hud-time').innerText = `${Math.floor(gameState.time/60).toString().padStart(2,'0')}:${Math.floor(gameState.time%60).toString().padStart(2,'0')}`;
+        if (gameState.isHost) {
+            gameState.time += delta * 15;
+        }
+        document.getElementById('hud-time').innerText = formatTime(gameState.time);
         
         if (energyEffect.active && energyEffect.bonusWorldTimer > 0) {
             energyEffect.bonusWorldTimer -= delta;
@@ -545,7 +709,6 @@
         if(!checkCol(camera.position.x,nz))camera.position.z=nz;
 
         raycaster.setFromCamera(center,camera);
-        // Interaction UI Check
         let objectsToCheck = energyEffect.active ? bonusScraps : worldObjects.children;
         const intersects=raycaster.intersectObjects(objectsToCheck,true);
         const interactMsg=document.getElementById('interact-msg');interactMsg.style.display='none';
@@ -564,7 +727,8 @@
     function endDay(died){if(energyEffect.active)exitBonusWorld();gameState.days--;document.exitPointerLock();if(gameState.days<=0){if(gameState.money>=gameState.quota){gameState.quota+=200+Math.floor(Math.random()*100);gameState.days=3;alert(`CONTRACT RENEWED.\n\nNEW QUOTA: ${gameState.quota}`);}else{alert(`QUOTA FAILED (${gameState.money}/${gameState.quota}).\n\nFIRED.`);location.reload();return;}}gameState.inMenu=true;gameState.gameOver=false;document.getElementById('ui-layer').classList.add('hidden');document.getElementById('terminal').classList.remove('hidden');document.getElementById('menu-money').innerText=gameState.money;document.getElementById('menu-quota').innerText=gameState.quota;document.getElementById('menu-days').innerText=gameState.days;}
     function updateHUD(){document.getElementById('hud-money').innerText=gameState.money;document.getElementById('hud-quota').innerText=gameState.quota;document.getElementById('hud-weight').innerText=player.weight;let invHTML=player.inventory.length>0?player.inventory.map(i=>`[${i.name||'SCRAP'}]`).join('<br>'):"EMPTY HANDS";if(player.hasEnergyDrink)invHTML+='<br><span style="color:#00ffff;">[MONSTER ENERGY]</span>';document.getElementById('hud-inventory').innerHTML=invHTML;}
     function notify(text,isBad){const n=document.getElementById('notification');n.innerText=text;n.className=isBad?'red-text':'';n.style.display='block';setTimeout(()=>n.style.display='none',3000);}
-    
+    function formatTime(t) { return `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`; }
+
     function animate(){requestAnimationFrame(animate);update();renderer.render(scene,camera);}
 </script>
 </body>
