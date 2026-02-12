@@ -2,454 +2,537 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Mafia (No Server)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MAFIA ONLINE</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Courier New', monospace; background: #111; color: #ddd; text-align: center; margin: 0; padding: 20px; }
-        h1 { color: #e74c3c; text-shadow: 0 0 5px #c0392b; }
-        .hidden { display: none !important; }
-        
-        /* Containers */
-        .container { max-width: 600px; margin: auto; padding: 20px; border: 1px solid #444; background: #222; border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
-        
-        /* Inputs & Buttons */
-        input { padding: 10px; font-size: 16px; background: #333; color: white; border: 1px solid #555; width: 70%; margin-bottom: 10px; text-align: center; }
-        button { padding: 12px 20px; font-size: 16px; cursor: pointer; background: #444; color: white; border: 1px solid #666; width: 100%; margin-top: 5px; transition: 0.2s; }
-        button:hover { background: #555; border-color: #888; }
-        button:disabled { background: #222; color: #555; cursor: not-allowed; }
-        
-        /* Game UI */
-        .player-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 20px; }
-        .player-card { 
-            position: relative; width: 100px; padding: 10px; border: 2px solid #555; background: #333; 
-            cursor: pointer; user-select: none; transition: 0.2s;
+        :root {
+            --bg-color: #1a1a1d;
+            --card-bg: #2b2b2e;
+            --text-main: #e0e0e0;
+            --accent-gold: #c5a059;
+            --accent-red: #a93226;
+            --accent-blue: #2471a3;
+            --accent-green: #27ae60;
         }
-        .player-card:hover { background: #444; }
-        .player-card.selected { border-color: #f1c40f; background: #443e10; }
-        .player-card.dead { background: #500; opacity: 0.6; border-color: #800; pointer-events: none; }
-        .player-card .name { font-weight: bold; font-size: 14px; }
-        .player-card .status { font-size: 12px; margin-top: 5px; color: #aaa; }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
-        #game-status { font-size: 1.4em; color: #f39c12; margin: 15px 0; min-height: 1.5em; }
-        #my-role { font-size: 1.8em; font-weight: bold; color: #2ecc71; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 10px;}
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Lato', sans-serif;
+            text-align: center;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- TYPOGRAPHY --- */
+        h1, h2, .banner-text { font-family: 'Playfair Display', serif; letter-spacing: 1px; }
+        h1 { margin: 20px 0 10px; font-size: 2.5rem; color: var(--accent-gold); }
         
-        #room-id-display { font-size: 1.2em; color: #f1c40f; margin: 10px 0; user-select: all; cursor: pointer; border: 1px dashed #555; padding: 5px; }
-        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 1px solid #f39c12; padding: 10px 20px; z-index: 100; display: none; }
+        /* --- SCREENS --- */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: var(--bg-color);
+            transition: opacity 0.3s;
+            padding: 20px;
+            z-index: 10;
+        }
+        .hidden { opacity: 0; pointer-events: none; z-index: -1; }
+
+        /* --- UI ELEMENTS --- */
+        input {
+            background: transparent; border: none; border-bottom: 2px solid #555;
+            color: #fff; font-size: 1.2rem; padding: 10px; text-align: center;
+            width: 80%; margin-bottom: 20px; outline: none; transition: 0.3s;
+        }
+        input:focus { border-color: var(--accent-gold); }
+
+        button {
+            background: var(--card-bg); border: 1px solid #555; color: #fff;
+            padding: 15px 40px; font-size: 1rem; border-radius: 50px;
+            cursor: pointer; margin: 10px; text-transform: uppercase;
+            letter-spacing: 2px; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        button:active { transform: scale(0.95); }
+        button.primary { background: var(--accent-gold); color: #000; border: none; font-weight: bold; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* --- GAME HEADER --- */
+        .game-header {
+            width: 100%; padding: 40px 0 20px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            position: absolute; top: 0; left: 0;
+        }
+        
+        .phase-banner {
+            background: #333; color: #fff; padding: 10px 30px;
+            display: inline-block; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
+            font-size: 1.5rem; margin-bottom: 5px; min-width: 200px;
+        }
+        .phase-sub { font-size: 0.9rem; opacity: 0.8; font-style: italic; }
+
+        /* --- PLAYER GRID (CIRCLES) --- */
+        .game-board {
+            flex-grow: 1; width: 100%; display: flex;
+            align-items: center; justify-content: center;
+            position: relative; margin-top: 60px;
+        }
+
+        .players-container {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;
+            max-width: 600px; width: 100%;
+        }
+
+        .avatar-wrapper {
+            display: flex; flex-direction: column; align-items: center;
+            position: relative; width: 80px;
+        }
+
+        .avatar {
+            width: 70px; height: 70px; border-radius: 50%;
+            background: #444; display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; font-weight: bold; color: #aaa;
+            border: 3px solid transparent; cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+
+        .avatar.selected { border-color: var(--accent-gold); transform: scale(1.1); box-shadow: 0 0 15px var(--accent-gold); }
+        .avatar.dead { opacity: 0.4; filter: grayscale(100%); border-color: #500; pointer-events: none; }
+        .avatar.dead::after { content: "✕"; position: absolute; font-size: 3rem; color: red; }
+
+        .p-name { margin-top: 8px; font-size: 0.8rem; font-weight: bold; color: #ccc; }
+        .p-votes { font-size: 0.7rem; color: var(--accent-red); margin-top: 2px; min-height: 12px; }
+
+        /* --- ACTION BAR --- */
+        .action-bar {
+            padding: 20px; width: 100%; background: #111;
+            border-top: 1px solid #333; z-index: 20;
+        }
+        .role-indicator { font-size: 0.9rem; color: #777; margin-bottom: 10px; }
+        .role-reveal { color: var(--accent-green); font-weight: bold; }
+
+        /* --- TOAST & COPY --- */
+        .toast {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9); padding: 20px 40px; border-radius: 10px;
+            border: 1px solid var(--accent-gold); color: var(--accent-gold);
+            font-family: 'Playfair Display', serif; font-size: 1.5rem;
+            z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.5s;
+        }
+        .toast.show { opacity: 1; }
+
+        .copy-box {
+            background: #000; padding: 10px 20px; border-radius: 5px;
+            border: 1px dashed #555; color: var(--accent-gold); font-family: monospace;
+            margin: 10px 0; user-select: all; cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
-    <div id="toast" class="toast">Notification</div>
+    <!-- NOTIFICATIONS -->
+    <div id="toast" class="toast">NIGHT FALLS</div>
 
-    <h1>MAFIA P2P</h1>
-
-    <!-- 1. LOGIN / MENU -->
-    <div id="menu-screen" class="container">
-        <h3>Enter Name</h3>
-        <input type="text" id="username" placeholder="Nickname">
-        <br><br>
-        <div style="border-top: 1px solid #444; padding-top: 20px;">
-            <button onclick="hostGame()" style="background: #2c3e50;">HOST NEW GAME</button>
-            <p>- OR -</p>
-            <input type="text" id="join-id" placeholder="Enter Room ID">
-            <button onclick="joinGame()" style="background: #27ae60;">JOIN GAME</button>
+    <!-- 1. MENU SCREEN -->
+    <div id="screen-menu" class="screen">
+        <h1>MAFIA</h1>
+        <p style="color:#777; margin-bottom: 40px;">THE SOCIAL DEDUCTION GAME</p>
+        
+        <input type="text" id="username" placeholder="Enter Your Name" maxlength="10">
+        
+        <button class="primary" onclick="hostGame()">Host Game</button>
+        
+        <div style="display:flex; align-items: center; gap: 10px; width: 80%; justify-content: center; margin-top: 20px;">
+            <input type="text" id="join-id" placeholder="Room ID" style="margin:0; font-size: 1rem;">
+            <button onclick="joinGame()" style="padding: 10px 20px; margin:0;">JOIN</button>
         </div>
-        <p id="loading-text" class="hidden" style="color:yellow;">Connecting...</p>
+        <p id="status-msg" style="margin-top: 20px; color: var(--accent-gold); font-size: 0.9rem;"></p>
     </div>
 
-    <!-- 2. LOBBY (HOST ONLY) -->
-    <div id="lobby-screen" class="container hidden">
+    <!-- 2. LOBBY SCREEN -->
+    <div id="screen-lobby" class="screen hidden">
         <h2>LOBBY</h2>
-        <p>Share this ID with friends:</p>
-        <div id="room-id-display" onclick="copyId()">Generating ID...</div>
-        <p>Players connected: <span id="player-count">1</span></p>
-        <ul id="lobby-list" style="text-align: left;"></ul>
-        <button id="start-btn" onclick="startGame()" disabled>START GAME (Need 3+)</button>
-    </div>
-
-    <!-- 3. GAME AREA -->
-    <div id="game-screen" class="container hidden">
-        <div id="my-role">Role: ???</div>
-        <div id="game-status">Waiting...</div>
+        <div class="copy-box" id="lobby-id" onclick="copyId()">Generating ID...</div>
+        <p style="font-size: 0.8rem; color: #777;">Tap ID to copy • Send to friends</p>
         
-        <div id="player-grid" class="player-grid"></div>
-
-        <div style="margin-top: 20px; border-top: 1px solid #444; padding-top: 10px;">
-            <button onclick="submitAction()">SUBMIT ACTION / VOTE</button>
-            <!-- Only Host sees this -->
-            <button id="host-next-btn" class="hidden" onclick="hostNextPhase()" style="background: #c0392b; margin-top: 10px;">NEXT PHASE (HOST)</button>
+        <div id="lobby-list" style="margin: 30px 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+            <!-- Player chips go here -->
         </div>
-        
-        <div id="log" style="margin-top: 20px; font-size: 12px; color: #777; height: 100px; overflow-y: scroll; border: 1px solid #333; text-align: left; padding: 5px;"></div>
+
+        <button id="start-btn" class="primary" onclick="startGame()" disabled>START GAME</button>
+        <p id="lobby-count" style="margin-top: 10px; color: #555;">Waiting for players...</p>
     </div>
 
+    <!-- 3. GAME SCREEN -->
+    <div id="screen-game" class="screen hidden" style="justify-content: flex-start; padding: 0;">
+        
+        <!-- Header -->
+        <div class="game-header">
+            <div id="phase-banner" class="phase-banner">NIGHT</div>
+            <div id="phase-sub" class="phase-sub">Mafia, choose a target</div>
+        </div>
+
+        <!-- Board -->
+        <div class="game-board">
+            <div id="players-grid" class="players-container">
+                <!-- Avatars generated here -->
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="action-bar">
+            <div class="role-indicator">YOU ARE: <span id="my-role" class="role-reveal">...</span></div>
+            <button id="action-btn" class="primary" style="width: 100%; margin: 0;" onclick="submitAction()">CONFIRM ACTION</button>
+            <button id="host-next-btn" style="width: 100%; margin: 10px 0 0; background: #333; font-size: 0.8rem;" class="hidden" onclick="hostNextPhase()">ADMIN: NEXT PHASE</button>
+        </div>
+    </div>
+
+    <!-- LOGIC -->
     <script>
-        // --- CONFIGURATION ---
-        const ROLES_POOL = ['Mafia', 'Doctor', 'Detective', 'Villager', 'Villager', 'Villager', 'Mafia', 'Villager'];
+        // --- CONFIG ---
+        const ROLES_ORDER = ['Mafia', 'Doctor', 'Detective', 'Villager', 'Villager', 'Mafia', 'Villager', 'Villager'];
+        const COLORS = ['#e74c3c', '#8e44ad', '#3498db', '#1abc9c', '#f1c40f', '#e67e22', '#ecf0f1', '#95a5a6'];
 
-        // --- GLOBAL STATE ---
-        let peer = null;
-        let myConn = null; // If client, this is connection to host
-        let connections = []; // If host, list of connections
-        
-        let myId = null;
-        let myName = "";
+        // --- STATE ---
+        let peer, conn;
+        let myId, myName;
         let isHost = false;
+        let connections = []; // Host only
         
-        // Game State (Synced)
-        let players = []; // { id, name, isAlive, role (hidden on client), votes }
-        let phase = 'lobby'; 
+        // Game State
+        let players = []; // { id, name, role, isAlive, avatarIdx }
+        let phase = 'lobby'; // lobby, night, day, gameover
+        let actions = {}; // Store votes/actions
         let gameLog = [];
-        
-        // Host Local State
-        let nightActions = {}; // { mafia: targetId, doctor: targetId, detective: targetId }
-        let votes = {};
 
-        // --- PEERJS SETUP ---
-        
-        function initPeer(callback) {
-            document.getElementById('loading-text').classList.remove('hidden');
-            peer = new Peer(); // Auto-generate ID
-            
+        // --- PEERJS INIT ---
+        function initPeer(cb) {
+            document.getElementById('status-msg').innerText = "Connecting to network...";
+            peer = new Peer();
             peer.on('open', (id) => {
                 myId = id;
-                document.getElementById('loading-text').classList.add('hidden');
-                callback(id);
+                document.getElementById('status-msg').innerText = "";
+                cb(id);
             });
-
-            peer.on('error', (err) => {
-                alert("Connection Error: " + err.type);
-                location.reload();
-            });
+            peer.on('error', err => alert("Connection Error: " + err.type));
         }
 
         // --- HOST LOGIC ---
-
         function hostGame() {
-            myName = document.getElementById('username').value || "Host";
+            myName = document.getElementById('username').value.trim() || "Host";
             isHost = true;
-            
             initPeer((id) => {
-                // UI Setup
-                document.getElementById('menu-screen').classList.add('hidden');
-                document.getElementById('lobby-screen').classList.remove('hidden');
-                document.getElementById('room-id-display').innerText = id;
-                document.getElementById('host-next-btn').classList.remove('hidden');
+                document.getElementById('screen-menu').classList.add('hidden');
+                document.getElementById('screen-lobby').classList.remove('hidden');
+                document.getElementById('lobby-id').innerText = id;
+                
+                // Host is player 0
+                players.push({ id: myId, name: myName, role: null, isAlive: true, avatarIdx: 0 });
+                updateLobby();
 
-                // Add self to players
-                players.push({ id: myId, name: myName, isAlive: true, role: null });
-                updateLobbyUI();
-
-                // Listen for connections
-                peer.on('connection', (conn) => {
-                    connections.push(conn);
-                    
-                    conn.on('data', (data) => handleDataHost(data, conn.peer));
-                    
-                    conn.on('close', () => {
-                        players = players.filter(p => p.id !== conn.peer);
-                        connections = connections.filter(c => c.peer !== conn.peer);
+                peer.on('connection', (c) => {
+                    connections.push(c);
+                    c.on('open', () => {}); // Wait for data
+                    c.on('data', (data) => handleHostData(data, c.peer));
+                    c.on('close', () => {
+                        players = players.filter(p => p.id !== c.peer);
+                        connections = connections.filter(conn => conn.peer !== c.peer);
                         broadcastState();
-                        updateLobbyUI();
+                        updateLobby();
                     });
                 });
             });
         }
 
-        function handleDataHost(data, senderId) {
-            if (data.type === 'join') {
-                const newPlayer = { id: senderId, name: data.name, isAlive: true, role: null };
-                players.push(newPlayer);
-                updateLobbyUI();
-                broadcastState(); // Sync everyone
+        function handleHostData(data, senderId) {
+            if(data.type === 'join') {
+                const newIdx = players.length % COLORS.length;
+                players.push({ id: senderId, name: data.name, role: null, isAlive: true, avatarIdx: newIdx });
+                updateLobby();
+                broadcastState();
             }
-            else if (data.type === 'action') {
-                processPlayerAction(senderId, data.targetId);
+            if(data.type === 'action') {
+                processAction(senderId, data.targetId);
             }
         }
 
-        function processPlayerAction(actorId, targetId) {
-            const actor = players.find(p => p.id === actorId);
-            if (!actor || !actor.isAlive) return;
-
-            if (phase === 'night') {
-                if (actor.role === 'Mafia') nightActions.mafia = targetId;
-                if (actor.role === 'Doctor') nightActions.doctor = targetId;
-                if (actor.role === 'Detective') {
-                    const target = players.find(p => p.id === targetId);
-                    // Send private result to detective
-                    const result = (target.role === 'Mafia') ? 'Mafia' : 'Innocent';
-                    sendPrivate(actorId, { type: 'alert', msg: `Investigation: ${target.name} is ${result}` });
-                }
-            } else if (phase === 'day') {
-                votes[actorId] = targetId;
-                broadcastState(); // Show who voted for whom (optional, or just counts)
-            }
+        function updateLobby() {
+            const list = document.getElementById('lobby-list');
+            list.innerHTML = players.map(p => 
+                `<div style="background:#333; padding:5px 10px; border-radius:15px; font-size:0.9rem;">${p.name}</div>`
+            ).join('');
+            document.getElementById('lobby-count').innerText = `${players.length} Players`;
+            document.getElementById('start-btn').disabled = players.length < 3;
         }
 
         function startGame() {
-            if (players.length < 3) return alert("Need at least 3 players!");
+            if(players.length < 3) return;
+            // Assign roles
+            let deck = ROLES_ORDER.slice(0, players.length).sort(() => Math.random() - 0.5);
+            players.forEach((p, i) => p.role = deck[i]);
             
-            // Assign Roles
-            let deck = ROLES_POOL.slice(0, players.length);
-            deck.sort(() => Math.random() - 0.5);
-            
-            players.forEach((p, i) => {
-                p.role = deck[i];
-            });
-
-            gameStarted = true;
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('screen-lobby').classList.add('hidden');
+            document.getElementById('screen-game').classList.remove('hidden');
+            document.getElementById('host-next-btn').classList.remove('hidden');
             
             startNight();
         }
 
+        function processAction(actorId, targetId) {
+            const actor = players.find(p => p.id === actorId);
+            if(!actor || !actor.isAlive) return;
+
+            if(phase === 'night') {
+                if(actor.role === 'Mafia') actions.mafia = targetId;
+                if(actor.role === 'Doctor') actions.doctor = targetId;
+                if(actor.role === 'Detective') {
+                    const target = players.find(p => p.id === targetId);
+                    const isMafia = target.role === 'Mafia';
+                    // Send private result
+                    const msg = `Investigation: ${target.name} is ${isMafia ? 'MAFIA' : 'INNOCENT'}`;
+                    sendPrivate(actorId, msg);
+                }
+            } else if (phase === 'day') {
+                actions.votes[actorId] = targetId;
+                broadcastState(); // Show vote counts
+            }
+        }
+
+        function hostNextPhase() {
+            if(phase === 'night') resolveNight();
+            else if(phase === 'day') resolveDay();
+        }
+
         function startNight() {
             phase = 'night';
-            nightActions = {};
-            votes = {};
-            broadcastState("Night falls. Mafia select a target. Doctor select a save.");
+            actions = { votes: {} };
+            broadcastState("Night falls. Mafia awake.");
+        }
+
+        function resolveNight() {
+            let msg = "Night is over. ";
+            const victimId = actions.mafia;
+            const saveId = actions.doctor;
+
+            if(victimId) {
+                if(victimId === saveId) msg += "Someone was saved!";
+                else {
+                    const victim = players.find(p => p.id === victimId);
+                    if(victim) {
+                        victim.isAlive = false;
+                        msg += `${victim.name} has died.`;
+                    }
+                }
+            } else {
+                msg += "It was peaceful.";
+            }
+
+            if(checkWin()) return;
+            startDay(msg);
         }
 
         function startDay(msg) {
             phase = 'day';
-            votes = {};
-            broadcastState(`Day rises. ${msg} Discuss and Vote.`);
+            actions = { votes: {} };
+            broadcastState(msg);
         }
 
-        function hostNextPhase() {
-            if (phase === 'night') {
-                // Process Night
-                let victimId = nightActions.mafia;
-                let savedId = nightActions.doctor;
-                let msg = "";
-
-                if (victimId) {
-                    if (victimId === savedId) {
-                        msg = "Someone was attacked but survived!";
-                    } else {
-                        let victim = players.find(p => p.id === victimId);
-                        victim.isAlive = false;
-                        msg = `${victim.name} was killed!`;
-                    }
-                } else {
-                    msg = "It was a quiet night.";
-                }
-
-                if (checkWin()) return;
-                startDay(msg);
-
-            } else if (phase === 'day') {
-                // Process Vote
-                let counts = {};
-                for (let v in votes) {
-                    let target = votes[v];
-                    counts[target] = (counts[target] || 0) + 1;
-                }
-
-                let max = 0;
-                let eliminatedId = null;
-                for (let id in counts) {
-                    if (counts[id] > max) {
-                        max = counts[id];
-                        eliminatedId = id;
-                    }
-                }
-                
-                // Tie breaker: strict majority or random? Simple: > 1 vote to die
-                let msg = "No one was eliminated.";
-                if (eliminatedId && max > 1) {
-                    let victim = players.find(p => p.id === eliminatedId);
-                    victim.isAlive = false;
-                    msg = `${victim.name} was voted out by the village!`;
-                }
-
-                if (checkWin()) return;
-                
-                broadcastState(msg);
-                setTimeout(() => startNight(), 3000); // Wait 3s so they see result, then night
+        function resolveDay() {
+            // Count votes
+            let counts = {};
+            Object.values(actions.votes).forEach(t => counts[t] = (counts[t]||0)+1);
+            
+            let max = 0;
+            let elimId = null;
+            for(const [id, c] of Object.entries(counts)) {
+                if(c > max) { max = c; elimId = id; }
             }
+
+            let msg = "No one was voted out.";
+            if(elimId && max > 1) { // Simple majorityish
+                const p = players.find(x => x.id === elimId);
+                p.isAlive = false;
+                msg = `${p.name} was voted out.`;
+            }
+
+            if(checkWin()) return;
+            broadcastState(msg);
+            setTimeout(() => startNight(), 3000);
         }
 
         function checkWin() {
-            let mafias = players.filter(p => p.isAlive && p.role === 'Mafia').length;
-            let villagers = players.filter(p => p.isAlive && p.role !== 'Mafia').length;
-
-            if (mafias === 0) {
-                broadcastState("GAME OVER: Villagers Win!");
-                phase = 'gameover';
-                return true;
-            } 
-            if (mafias >= villagers) {
-                broadcastState("GAME OVER: Mafia Wins!");
-                phase = 'gameover';
-                return true;
-            }
+            const mafia = players.filter(p => p.isAlive && p.role === 'Mafia').length;
+            const good = players.filter(p => p.isAlive && p.role !== 'Mafia').length;
+            
+            if(mafia === 0) { endGame("VILLAGERS WIN"); return true; }
+            if(mafia >= good) { endGame("MAFIA WINS"); return true; }
             return false;
         }
 
-        function broadcastState(notification = null) {
-            // We strip roles from the public list so clients don't cheat by looking at packets
+        function endGame(res) {
+            phase = 'gameover';
+            broadcastState(res);
+        }
+
+        function broadcastState(toastMsg = null) {
+            // Clean state for clients (Hide roles)
             const publicPlayers = players.map(p => ({
-                id: p.id,
-                name: p.name,
-                isAlive: p.isAlive,
-                // Don't send role!
+                id: p.id, name: p.name, isAlive: p.isAlive, avatarIdx: p.avatarIdx,
+                // Only send votes during day to visualize
+                voteCount: phase === 'day' ? Object.values(actions.votes).filter(v => v === p.id).length : 0
             }));
 
-            const state = {
-                type: 'update',
-                players: publicPlayers,
-                phase: phase,
-                notification: notification
-            };
+            const state = { type: 'update', players: publicPlayers, phase, toast: toastMsg };
 
-            // Send to Host UI (Local)
-            handleDataClient(state);
-            // Inject my own role locally
-            const me = players.find(p => p.id === myId);
-            if(me) document.getElementById('my-role').innerText = "Role: " + me.role;
+            // Update Host UI
+            renderGame(state, players.find(p=>p.id===myId).role);
+            if(toastMsg) showToast(toastMsg);
 
-            // Send to Clients (Inject their specific role)
-            connections.forEach(conn => {
-                const p = players.find(pl => pl.id === conn.peer);
-                const clientState = JSON.parse(JSON.stringify(state)); // Deep copy
-                clientState.myRole = p ? p.role : 'Spectator';
-                conn.send(clientState);
+            // Send to Clients
+            connections.forEach(c => {
+                const p = players.find(x => x.id === c.peer);
+                const pRole = p ? p.role : 'Spectator';
+                c.send({ ...state, myRole: pRole });
             });
         }
 
-        function sendPrivate(targetId, data) {
-            if (targetId === myId) {
-                alert(data.msg); // Host alert
-            } else {
-                const conn = connections.find(c => c.peer === targetId);
-                if (conn) conn.send(data);
+        function sendPrivate(targetId, msg) {
+            if(targetId === myId) alert(msg);
+            else {
+                const c = connections.find(x => x.peer === targetId);
+                if(c) c.send({ type: 'alert', msg });
             }
         }
-
-        function updateLobbyUI() {
-            const list = document.getElementById('lobby-list');
-            list.innerHTML = players.map(p => `<li>${p.name}</li>`).join('');
-            document.getElementById('player-count').innerText = players.length;
-            document.getElementById('start-btn').disabled = players.length < 3;
-        }
-
 
         // --- CLIENT LOGIC ---
-
         function joinGame() {
-            myName = document.getElementById('username').value || "Player";
-            const hostId = document.getElementById('join-id').value;
-            if (!hostId) return alert("Enter Host ID");
+            myName = document.getElementById('username').value.trim() || "Guest";
+            const hostId = document.getElementById('join-id').value.trim();
+            if(!hostId) return;
 
             initPeer((id) => {
-                document.getElementById('menu-screen').classList.add('hidden');
-                document.getElementById('loading-text').classList.remove('hidden');
-                document.getElementById('loading-text').innerText = "Connecting to Host...";
-
-                myConn = peer.connect(hostId);
-
-                myConn.on('open', () => {
-                    document.getElementById('loading-text').innerText = "Waiting for game start...";
-                    // Send Join Request
-                    myConn.send({ type: 'join', name: myName });
+                conn = peer.connect(hostId);
+                conn.on('open', () => {
+                    document.getElementById('status-msg').innerText = "Connected. Waiting for host...";
+                    conn.send({ type: 'join', name: myName });
                 });
-
-                myConn.on('data', (data) => handleDataClient(data));
-                
-                myConn.on('close', () => {
-                    alert("Host disconnected");
-                    location.reload();
+                conn.on('data', data => {
+                    if(data.type === 'update') {
+                        if(document.getElementById('screen-game').classList.contains('hidden')) {
+                            document.getElementById('screen-menu').classList.add('hidden');
+                            document.getElementById('screen-game').classList.remove('hidden');
+                        }
+                        renderGame(data, data.myRole);
+                        if(data.toast) showToast(data.toast);
+                    }
+                    if(data.type === 'alert') alert(data.msg);
                 });
             });
         }
 
-        function handleDataClient(data) {
-            if (data.type === 'update') {
-                // Switch screens if needed
-                if (document.getElementById('game-screen').classList.contains('hidden')) {
-                    document.getElementById('menu-screen').classList.add('hidden');
-                    document.getElementById('game-screen').classList.remove('hidden');
-                    document.getElementById('loading-text').classList.add('hidden');
-                }
-
-                // Update Role if provided
-                if (data.myRole) {
-                    document.getElementById('my-role').innerText = "Role: " + data.myRole;
-                }
-
-                // Update Status
-                document.getElementById('game-status').innerText = phase.toUpperCase();
-                
-                // Notification
-                if (data.notification) {
-                    showToast(data.notification);
-                    const log = document.getElementById('log');
-                    log.innerHTML += `<div>> ${data.notification}</div>`;
-                    log.scrollTop = log.scrollHeight;
-                }
-
-                // Render Grid
-                const grid = document.getElementById('player-grid');
-                grid.innerHTML = '';
-                
-                data.players.forEach(p => {
-                    const div = document.createElement('div');
-                    div.className = `player-card ${p.isAlive ? '' : 'dead'}`;
-                    div.innerHTML = `<div class="name">${p.name}</div><div class="status">${p.isAlive ? 'Alive' : 'DEAD'}</div>`;
-                    div.onclick = () => selectPlayer(p.id, div);
-                    grid.appendChild(div);
-                });
-            }
-            if (data.type === 'alert') {
-                alert(data.msg);
-            }
-        }
-
-        // --- SHARED UI ACTIONS ---
-
+        // --- RENDERER ---
         let selectedTarget = null;
 
-        function selectPlayer(id, el) {
-            // Cannot select dead players or self usually, but keeping logic simple
+        function renderGame(state, myRole) {
+            // Update Phase UI
+            const ban = document.getElementById('phase-banner');
+            const sub = document.getElementById('phase-sub');
+            const btn = document.getElementById('action-btn');
+            
+            ban.innerText = state.phase.toUpperCase();
+            document.getElementById('my-role').innerText = myRole;
+
+            if(state.phase === 'night') {
+                ban.style.backgroundColor = '#2c3e50';
+                sub.innerText = "Mafia kill, Doctor save, Detective check.";
+                btn.innerText = "SUBMIT NIGHT ACTION";
+            } else if(state.phase === 'day') {
+                ban.style.backgroundColor = '#f39c12';
+                sub.innerText = "Discuss and Vote.";
+                btn.innerText = "VOTE TO ELIMINATE";
+            } else {
+                ban.style.backgroundColor = '#c0392b';
+                sub.innerText = "Game Over";
+                btn.disabled = true;
+            }
+
+            // Render Grid
+            const grid = document.getElementById('players-grid');
+            grid.innerHTML = '';
+            
+            state.players.forEach(p => {
+                const isMe = p.id === myId;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'avatar-wrapper';
+                
+                // Color generation
+                const color = COLORS[p.avatarIdx % COLORS.length];
+                const letter = p.name.substring(0, 1).toUpperCase();
+                
+                const deadClass = p.isAlive ? '' : 'dead';
+                const selClass = (selectedTarget === p.id) ? 'selected' : '';
+                
+                wrapper.innerHTML = `
+                    <div class="avatar ${deadClass} ${selClass}" 
+                         style="background-color: ${color};" 
+                         onclick="selectPlayer('${p.id}', ${p.isAlive})">
+                        ${letter}
+                    </div>
+                    <div class="p-name">${p.name} ${isMe ? '(YOU)' : ''}</div>
+                    <div class="p-votes">${phase === 'day' && p.voteCount > 0 ? '•'.repeat(p.voteCount) : ''}</div>
+                `;
+                grid.appendChild(wrapper);
+            });
+        }
+
+        function selectPlayer(id, isAlive) {
+            if(!isAlive) return;
             selectedTarget = id;
-            document.querySelectorAll('.player-card').forEach(e => e.classList.remove('selected'));
-            el.classList.add('selected');
+            // Re-trigger render to update selection visuals (lazy way)
+            document.querySelectorAll('.avatar').forEach(el => el.classList.remove('selected'));
+            // Find specific element to add class is hard without re-render, 
+            // but in real app we update state. Here we just visually update current DOM.
+            const wrappers = document.querySelectorAll('.avatar-wrapper');
+            // This is a quick hack to highlight without waiting for server roundtrip
+            // In a real framework (React/Vue) this would be state-driven
+            const allAvatars = document.querySelectorAll('.avatar');
+            // Reset
+            allAvatars.forEach(a => a.classList.remove('selected'));
+            // Set
+            event.currentTarget.classList.add('selected');
         }
 
         function submitAction() {
-            if (!selectedTarget) return showToast("Select a player first!");
+            if(!selectedTarget) return showToast("SELECT A PLAYER");
             
-            if (isHost) {
-                // Host processes directly
-                processPlayerAction(myId, selectedTarget);
-                showToast("Action Submitted");
-            } else {
-                // Client sends to host
-                myConn.send({ type: 'action', targetId: selectedTarget });
-                showToast("Action Sent to Host");
-            }
+            if(isHost) processAction(myId, selectedTarget);
+            else conn.send({ type: 'action', targetId: selectedTarget });
             
-            // Visual feedback reset
+            showToast("ACTION SENT");
             selectedTarget = null;
-            document.querySelectorAll('.player-card').forEach(e => e.classList.remove('selected'));
-        }
-
-        function copyId() {
-            const text = document.getElementById('room-id-display').innerText;
-            navigator.clipboard.writeText(text).then(() => showToast("ID Copied!"));
+            document.querySelectorAll('.avatar').forEach(a => a.classList.remove('selected'));
         }
 
         function showToast(msg) {
             const t = document.getElementById('toast');
             t.innerText = msg;
-            t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 3000);
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
         }
 
+        function copyId() {
+            const txt = document.getElementById('lobby-id').innerText;
+            navigator.clipboard.writeText(txt);
+            showToast("ID COPIED");
+        }
     </script>
 </body>
 </html>
