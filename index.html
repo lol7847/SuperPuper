@@ -3,250 +3,309 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MAFIA ONLINE</title>
+    <title>PROTOCOL: MAFIA // SECTOR 7</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #1a1a1d;
-            --card-bg: #2b2b2e;
-            --text-main: #e0e0e0;
-            --accent-gold: #c5a059;
-            --accent-red: #a93226;
-            --accent-blue: #2471a3;
-            --accent-green: #27ae60;
+            --neon-blue: #00f3ff;
+            --neon-red: #ff0055;
+            --neon-green: #00ff9d;
+            --neon-gold: #ffcc00;
+            --bg-dark: #050510;
+            --glass: rgba(0, 20, 40, 0.7);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
+
         body {
-            margin: 0; padding: 0;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            font-family: 'Lato', sans-serif;
-            text-align: center;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            margin: 0; overflow: hidden;
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+            font-family: 'Rajdhani', sans-serif;
+            color: var(--neon-blue);
+            height: 100vh; display: flex; flex-direction: column;
         }
 
-        /* --- TYPOGRAPHY --- */
-        h1, h2, .banner-text { font-family: 'Playfair Display', serif; letter-spacing: 1px; }
-        h1 { margin: 20px 0 10px; font-size: 2.5rem; color: var(--accent-gold); }
+        /* --- UI UTILS --- */
+        .hidden { display: none !important; }
+        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; margin: 0; letter-spacing: 2px; }
         
+        button {
+            background: rgba(0, 243, 255, 0.1); border: 1px solid var(--neon-blue);
+            color: var(--neon-blue); padding: 12px 24px; font-family: 'Orbitron';
+            cursor: pointer; transition: 0.3s; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+        button:hover { background: var(--neon-blue); color: #000; box-shadow: 0 0 15px var(--neon-blue); }
+        button:disabled { border-color: #333; color: #555; pointer-events: none; }
+
+        input {
+            background: transparent; border: none; border-bottom: 2px solid var(--neon-blue);
+            color: #fff; font-family: 'Orbitron'; font-size: 1.2rem; text-align: center;
+            width: 80%; margin: 10px 0; outline: none;
+        }
+
         /* --- SCREENS --- */
         .screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: var(--bg-color);
-            transition: opacity 0.3s;
-            padding: 20px;
-            z-index: 10;
+            background: var(--bg-dark); z-index: 10; transition: opacity 0.5s;
         }
-        .hidden { opacity: 0; pointer-events: none; z-index: -1; }
 
-        /* --- UI ELEMENTS --- */
-        input {
-            background: transparent; border: none; border-bottom: 2px solid #555;
-            color: #fff; font-size: 1.2rem; padding: 10px; text-align: center;
-            width: 80%; margin-bottom: 20px; outline: none; transition: 0.3s;
-        }
-        input:focus { border-color: var(--accent-gold); }
+        /* --- GAME LAYOUT --- */
+        #game-ui { position: relative; width: 100%; height: 100%; overflow: hidden; }
 
-        button {
-            background: var(--card-bg); border: 1px solid #555; color: #fff;
-            padding: 15px 40px; font-size: 1rem; border-radius: 50px;
-            cursor: pointer; margin: 10px; text-transform: uppercase;
-            letter-spacing: 2px; transition: 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        /* HEADER INFO */
+        .top-bar {
+            position: absolute; top: 0; left: 0; width: 100%; padding: 15px;
+            display: flex; justify-content: space-between; align-items: center;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+            z-index: 5; pointer-events: none;
         }
-        button:active { transform: scale(0.95); }
-        button.primary { background: var(--accent-gold); color: #000; border: none; font-weight: bold; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .role-badge {
+            border: 1px solid var(--neon-gold); color: var(--neon-gold);
+            padding: 5px 15px; font-weight: bold; font-family: 'Orbitron';
+            background: rgba(0,0,0,0.8); pointer-events: auto;
+        }
 
-        /* --- GAME HEADER --- */
-        .game-header {
-            width: 100%; padding: 40px 0 20px;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
-            position: absolute; top: 0; left: 0;
-        }
-        
-        .phase-banner {
-            background: #333; color: #fff; padding: 10px 30px;
-            display: inline-block; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
-            font-size: 1.5rem; margin-bottom: 5px; min-width: 200px;
-        }
-        .phase-sub { font-size: 0.9rem; opacity: 0.8; font-style: italic; }
-
-        /* --- PLAYER GRID (CIRCLES) --- */
-        .game-board {
-            flex-grow: 1; width: 100%; display: flex;
+        /* CENTER TABLE (REACTOR) */
+        .table-container {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px; height: 300px;
+            border-radius: 50%;
+            border: 2px dashed var(--neon-blue);
+            box-shadow: 0 0 50px rgba(0, 243, 255, 0.2);
+            display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            position: relative; margin-top: 60px;
+            animation: spin 60s linear infinite;
         }
+        @keyframes spin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
 
-        .players-container {
-            display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;
-            max-width: 600px; width: 100%;
+        /* STATIONARY INFO INSIDE TABLE */
+        .reactor-core {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center; z-index: 4;
+            width: 200px;
         }
+        #timer-display { font-size: 4rem; color: #fff; text-shadow: 0 0 20px #fff; font-family: 'Orbitron'; }
+        #phase-display { font-size: 1.2rem; color: var(--neon-green); letter-spacing: 3px; }
 
-        .avatar-wrapper {
+        /* PLAYERS ORBIT */
+        .player-orbit {
+            position: absolute; width: 100%; height: 100%;
+            top: 0; left: 0; pointer-events: none;
+        }
+        .player-node {
+            position: absolute; width: 80px; height: 80px;
+            /* Centering logic handled in JS */
+            transform: translate(-50%, -50%);
+            pointer-events: auto; cursor: pointer;
             display: flex; flex-direction: column; align-items: center;
-            position: relative; width: 80px;
+            transition: 0.3s;
         }
-
-        .avatar {
-            width: 70px; height: 70px; border-radius: 50%;
-            background: #444; display: flex; align-items: center; justify-content: center;
-            font-size: 1.5rem; font-weight: bold; color: #aaa;
-            border: 3px solid transparent; cursor: pointer;
-            transition: transform 0.2s, border-color 0.2s;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        .node-circle {
+            width: 60px; height: 60px; border-radius: 50%;
+            background: #000; border: 2px solid #333;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 1.5rem; color: #555;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            position: relative;
         }
+        .player-node.alive .node-circle { border-color: var(--neon-blue); color: #fff; box-shadow: 0 0 15px var(--neon-blue); }
+        .player-node.dead .node-circle { border-color: var(--neon-red); color: var(--neon-red); opacity: 0.5; }
+        .player-node.selected .node-circle { background: var(--neon-gold); color: #000; box-shadow: 0 0 25px var(--neon-gold); }
+        
+        .node-name { margin-top: 5px; font-size: 0.8rem; text-shadow: 0 0 5px #000; background: rgba(0,0,0,0.6); padding: 2px 5px; }
 
-        .avatar.selected { border-color: var(--accent-gold); transform: scale(1.1); box-shadow: 0 0 15px var(--accent-gold); }
-        .avatar.dead { opacity: 0.4; filter: grayscale(100%); border-color: #500; pointer-events: none; }
-        .avatar.dead::after { content: "✕"; position: absolute; font-size: 3rem; color: red; }
-
-        .p-name { margin-top: 8px; font-size: 0.8rem; font-weight: bold; color: #ccc; }
-        .p-votes { font-size: 0.7rem; color: var(--accent-red); margin-top: 2px; min-height: 12px; }
-
-        /* --- ACTION BAR --- */
-        .action-bar {
-            padding: 20px; width: 100%; background: #111;
-            border-top: 1px solid #333; z-index: 20;
+        /* CHAT MODULE */
+        .comms-panel {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 25%;
+            background: rgba(0, 10, 20, 0.9); border-top: 1px solid var(--neon-blue);
+            display: flex; flex-direction: column;
+            z-index: 20;
         }
-        .role-indicator { font-size: 0.9rem; color: #777; margin-bottom: 10px; }
-        .role-reveal { color: var(--accent-green); font-weight: bold; }
+        .chat-log { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 0.9rem; text-align: left; }
+        .chat-entry { display: flex; border-top: 1px solid #333; }
+        .chat-entry input { width: 100%; margin: 0; border: none; padding: 10px; text-align: left; }
+        .chat-msg { margin-bottom: 4px; }
+        .sys-msg { color: var(--neon-gold); font-style: italic; }
 
-        /* --- TOAST & COPY --- */
-        .toast {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9); padding: 20px 40px; border-radius: 10px;
-            border: 1px solid var(--accent-gold); color: var(--accent-gold);
-            font-family: 'Playfair Display', serif; font-size: 1.5rem;
-            z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.5s;
+        /* VOICE BUTTON */
+        #voice-btn {
+            position: absolute; bottom: 26%; right: 10px;
+            width: 50px; height: 50px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; padding: 0; z-index: 25;
+            background: #000; border-color: var(--neon-green);
         }
-        .toast.show { opacity: 1; }
+        #voice-btn.active { background: var(--neon-green); color: #000; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0,255,157, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(0,255,157, 0); } 100% { box-shadow: 0 0 0 0 rgba(0,255,157, 0); } }
 
-        .copy-box {
-            background: #000; padding: 10px 20px; border-radius: 5px;
-            border: 1px dashed #555; color: var(--accent-gold); font-family: monospace;
-            margin: 10px 0; user-select: all; cursor: pointer;
+        /* OVERLAYS */
+        .overlay-msg {
+            position: absolute; top: 30%; width: 100%; text-align: center;
+            font-size: 2rem; color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red);
+            pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 30;
         }
     </style>
 </head>
 <body>
 
-    <!-- NOTIFICATIONS -->
-    <div id="toast" class="toast">NIGHT FALLS</div>
-
-    <!-- 1. MENU SCREEN -->
+    <!-- 1. MAIN MENU -->
     <div id="screen-menu" class="screen">
-        <h1>MAFIA</h1>
-        <p style="color:#777; margin-bottom: 40px;">THE SOCIAL DEDUCTION GAME</p>
-        
-        <input type="text" id="username" placeholder="Enter Your Name" maxlength="10">
-        
-        <button class="primary" onclick="hostGame()">Host Game</button>
-        
-        <div style="display:flex; align-items: center; gap: 10px; width: 80%; justify-content: center; margin-top: 20px;">
-            <input type="text" id="join-id" placeholder="Room ID" style="margin:0; font-size: 1rem;">
-            <button onclick="joinGame()" style="padding: 10px 20px; margin:0;">JOIN</button>
+        <h1 style="font-size: 3rem; color: var(--neon-blue); text-shadow: 0 0 20px var(--neon-blue);">MAFIA 2077</h1>
+        <br>
+        <input type="text" id="username" placeholder="IDENTIFICATION" maxlength="12">
+        <br>
+        <button onclick="initHost()">INITIALIZE HOST</button>
+        <div style="margin: 20px 0; display:flex; gap:10px;">
+            <input type="text" id="join-id" placeholder="UPLINK ID" style="margin:0; width: 150px;">
+            <button onclick="joinGame()" style="padding: 10px;">CONNECT</button>
         </div>
-        <p id="status-msg" style="margin-top: 20px; color: var(--accent-gold); font-size: 0.9rem;"></p>
+        <p id="menu-status" style="color: var(--neon-gold); font-size: 0.8rem;"></p>
     </div>
 
-    <!-- 2. LOBBY SCREEN -->
+    <!-- 2. LOBBY -->
     <div id="screen-lobby" class="screen hidden">
-        <h2>LOBBY</h2>
-        <div class="copy-box" id="lobby-id" onclick="copyId()">Generating ID...</div>
-        <p style="font-size: 0.8rem; color: #777;">Tap ID to copy • Send to friends</p>
-        
-        <div id="lobby-list" style="margin: 30px 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
-            <!-- Player chips go here -->
+        <h2>PRE-FLIGHT CHECK</h2>
+        <div style="background: #000; padding: 10px; border: 1px dashed var(--neon-blue); cursor: pointer;" onclick="copyId()">
+            <span id="lobby-id" style="font-family: monospace;">GENERATING...</span>
         </div>
-
-        <button id="start-btn" class="primary" onclick="startGame()" disabled>START GAME</button>
-        <p id="lobby-count" style="margin-top: 10px; color: #555;">Waiting for players...</p>
+        <div id="lobby-list" style="margin: 30px 0; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;"></div>
+        <button id="start-btn" onclick="startGame()" disabled>ENGAGE SEQUENCE</button>
+        <p>WAITING FOR CREW (MIN 3)</p>
     </div>
 
-    <!-- 3. GAME SCREEN -->
-    <div id="screen-game" class="screen hidden" style="justify-content: flex-start; padding: 0;">
+    <!-- 3. GAME UI -->
+    <div id="screen-game" class="screen hidden" style="display: block;">
         
-        <!-- Header -->
-        <div class="game-header">
-            <div id="phase-banner" class="phase-banner">NIGHT</div>
-            <div id="phase-sub" class="phase-sub">Mafia, choose a target</div>
+        <div class="top-bar">
+            <div>SECTOR 7 // <span id="day-counter">DAY 1</span></div>
+            <div id="role-badge" class="role-badge">LOADING...</div>
         </div>
 
-        <!-- Board -->
-        <div class="game-board">
-            <div id="players-grid" class="players-container">
-                <!-- Avatars generated here -->
+        <div class="overlay-msg" id="alert-overlay">SYSTEM ALERT</div>
+
+        <!-- CENTER TABLE -->
+        <div class="table-container"></div>
+        
+        <!-- STATIONARY CENTER -->
+        <div class="reactor-core">
+            <div id="timer-display">00</div>
+            <div id="phase-display">STANDBY</div>
+        </div>
+
+        <!-- PLAYERS -->
+        <div id="orbit-container" class="player-orbit"></div>
+
+        <!-- VOICE TOGGLE -->
+        <button id="voice-btn" onclick="toggleVoice()">🎤</button>
+
+        <!-- CHAT -->
+        <div class="comms-panel">
+            <div id="chat-log" class="chat-log"></div>
+            <div class="chat-entry">
+                <input type="text" id="chat-input" placeholder="TRANSMIT MESSAGE..." onkeydown="if(event.key==='Enter') sendChat()">
+                <button onclick="sendChat()" style="width: auto; padding: 0 20px;">></button>
             </div>
         </div>
-
-        <!-- Footer -->
-        <div class="action-bar">
-            <div class="role-indicator">YOU ARE: <span id="my-role" class="role-reveal">...</span></div>
-            <button id="action-btn" class="primary" style="width: 100%; margin: 0;" onclick="submitAction()">CONFIRM ACTION</button>
-            <button id="host-next-btn" style="width: 100%; margin: 10px 0 0; background: #333; font-size: 0.8rem;" class="hidden" onclick="hostNextPhase()">ADMIN: NEXT PHASE</button>
-        </div>
     </div>
 
-    <!-- LOGIC -->
     <script>
-        // --- CONFIG ---
-        const ROLES_ORDER = ['Mafia', 'Doctor', 'Detective', 'Villager', 'Villager', 'Mafia', 'Villager', 'Villager'];
-        const COLORS = ['#e74c3c', '#8e44ad', '#3498db', '#1abc9c', '#f1c40f', '#e67e22', '#ecf0f1', '#95a5a6'];
+        // --- CONSTANTS & CONFIG ---
+        const ROLES = ['Mafia', 'Doctor', 'Detective', 'Villager', 'Villager', 'Mafia', 'Villager', 'Villager'];
+        const TIMERS = {
+            INTRO: 5,
+            NIGHT: 20,
+            DAY: 45
+        };
 
-        // --- STATE ---
+        // --- GLOBAL STATE ---
         let peer, conn;
         let myId, myName;
         let isHost = false;
         let connections = []; // Host only
+        let myStream = null;  // Audio
         
         // Game State
-        let players = []; // { id, name, role, isAlive, avatarIdx }
-        let phase = 'lobby'; // lobby, night, day, gameover
-        let actions = {}; // Store votes/actions
-        let gameLog = [];
+        let players = []; // { id, name, role, isAlive, lastHealedRound }
+        let gameState = {
+            phase: 'lobby', // lobby, intro, night, day, gameover
+            timer: 0,
+            dayCount: 1,
+            actions: {} // { mafia: id, doctor: id, detective: id, votes: { voterId: targetId } }
+        };
+        
+        let interval = null;
 
-        // --- PEERJS INIT ---
+        // --- PEERJS SETUP ---
         function initPeer(cb) {
-            document.getElementById('status-msg').innerText = "Connecting to network...";
+            document.getElementById('menu-status').innerText = "ESTABLISHING UPLINK...";
             peer = new Peer();
             peer.on('open', (id) => {
                 myId = id;
-                document.getElementById('status-msg').innerText = "";
+                document.getElementById('menu-status').innerText = "";
                 cb(id);
             });
-            peer.on('error', err => alert("Connection Error: " + err.type));
+            peer.on('error', err => alert("UPLINK FAILED: " + err.type));
+            
+            // Voice handling (Receiver)
+            peer.on('call', (call) => {
+                call.answer(myStream); // Answer with our stream if available
+                call.on('stream', remoteStream => {
+                    const audio = new Audio();
+                    audio.srcObject = remoteStream;
+                    audio.play();
+                });
+            });
+        }
+
+        // --- VOICE CHAT (BASIC) ---
+        async function toggleVoice() {
+            const btn = document.getElementById('voice-btn');
+            if(myStream) {
+                // Mute/Stop
+                myStream.getTracks().forEach(t => t.stop());
+                myStream = null;
+                btn.classList.remove('active');
+            } else {
+                try {
+                    myStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    btn.classList.add('active');
+                    // In a mesh network, we'd call everyone. 
+                    // Simplified: Call Host if client, Call everyone if Host.
+                    if(!isHost && conn) {
+                        peer.call(conn.peer, myStream);
+                    } else if(isHost) {
+                        connections.forEach(c => peer.call(c.peer, myStream));
+                    }
+                } catch(e) {
+                    alert("MICROPHONE ACCESS DENIED");
+                }
+            }
         }
 
         // --- HOST LOGIC ---
-        function hostGame() {
-            myName = document.getElementById('username').value.trim() || "Host";
+        function initHost() {
+            myName = document.getElementById('username').value.trim() || "COMMANDER";
             isHost = true;
             initPeer((id) => {
                 document.getElementById('screen-menu').classList.add('hidden');
                 document.getElementById('screen-lobby').classList.remove('hidden');
                 document.getElementById('lobby-id').innerText = id;
                 
-                // Host is player 0
-                players.push({ id: myId, name: myName, role: null, isAlive: true, avatarIdx: 0 });
+                players.push({ id: myId, name: myName, role: null, isAlive: true, lastHealedRound: 0 });
                 updateLobby();
 
                 peer.on('connection', (c) => {
                     connections.push(c);
-                    c.on('open', () => {}); // Wait for data
                     c.on('data', (data) => handleHostData(data, c.peer));
                     c.on('close', () => {
                         players = players.filter(p => p.id !== c.peer);
-                        connections = connections.filter(conn => conn.peer !== c.peer);
-                        broadcastState();
+                        connections = connections.filter(x => x.peer !== c.peer);
                         updateLobby();
+                        broadcastState();
                     });
                 });
             });
@@ -254,101 +313,114 @@
 
         function handleHostData(data, senderId) {
             if(data.type === 'join') {
-                const newIdx = players.length % COLORS.length;
-                players.push({ id: senderId, name: data.name, role: null, isAlive: true, avatarIdx: newIdx });
+                players.push({ id: senderId, name: data.name, role: null, isAlive: true, lastHealedRound: 0 });
                 updateLobby();
                 broadcastState();
-            }
-            if(data.type === 'action') {
-                processAction(senderId, data.targetId);
+            } else if (data.type === 'action') {
+                handleGameAction(senderId, data.payload);
+            } else if (data.type === 'chat') {
+                broadcastChat(data.name, data.msg);
             }
         }
 
         function updateLobby() {
             const list = document.getElementById('lobby-list');
-            list.innerHTML = players.map(p => 
-                `<div style="background:#333; padding:5px 10px; border-radius:15px; font-size:0.9rem;">${p.name}</div>`
-            ).join('');
-            document.getElementById('lobby-count').innerText = `${players.length} Players`;
+            list.innerHTML = players.map(p => `<div style="background:#111; color:var(--neon-blue); padding:5px 10px; border:1px solid var(--neon-blue);">${p.name}</div>`).join('');
             document.getElementById('start-btn').disabled = players.length < 3;
         }
 
         function startGame() {
             if(players.length < 3) return;
-            // Assign roles
-            let deck = ROLES_ORDER.slice(0, players.length).sort(() => Math.random() - 0.5);
+            // Assign Roles
+            let deck = ROLES.slice(0, players.length).sort(() => Math.random() - 0.5);
             players.forEach((p, i) => p.role = deck[i]);
             
             document.getElementById('screen-lobby').classList.add('hidden');
             document.getElementById('screen-game').classList.remove('hidden');
-            document.getElementById('host-next-btn').classList.remove('hidden');
             
-            startNight();
+            // START LOOP
+            runPhase('intro');
         }
 
-        function processAction(actorId, targetId) {
-            const actor = players.find(p => p.id === actorId);
-            if(!actor || !actor.isAlive) return;
+        // --- GAME LOOP (HOST) ---
+        function runPhase(phase) {
+            gameState.phase = phase;
+            gameState.actions = { votes: {} }; // Reset actions
+            
+            let duration = 0;
+            let msg = "";
 
-            if(phase === 'night') {
-                if(actor.role === 'Mafia') actions.mafia = targetId;
-                if(actor.role === 'Doctor') actions.doctor = targetId;
-                if(actor.role === 'Detective') {
-                    const target = players.find(p => p.id === targetId);
-                    const isMafia = target.role === 'Mafia';
-                    // Send private result
-                    const msg = `Investigation: ${target.name} is ${isMafia ? 'MAFIA' : 'INNOCENT'}`;
-                    sendPrivate(actorId, msg);
-                }
+            if(phase === 'intro') {
+                duration = TIMERS.INTRO;
+                msg = "INITIALIZING SEQUENCE...";
+            } else if (phase === 'night') {
+                duration = TIMERS.NIGHT;
+                msg = "NIGHT CYCLE. ROLES ENGAGE.";
             } else if (phase === 'day') {
-                actions.votes[actorId] = targetId;
-                broadcastState(); // Show vote counts
+                duration = TIMERS.DAY;
+                msg = "DAY CYCLE. DELIBERATE.";
             }
+
+            gameState.timer = duration;
+            broadcastState(msg);
+
+            // Timer Logic
+            if(interval) clearInterval(interval);
+            interval = setInterval(() => {
+                gameState.timer--;
+                
+                // Sync timer occasionally to keep clients aligned without spamming
+                if(gameState.timer % 5 === 0 || gameState.timer <= 5) {
+                    broadcastTimer();
+                }
+
+                if(gameState.timer <= 0) {
+                    clearInterval(interval);
+                    nextPhase();
+                }
+            }, 1000);
         }
 
-        function hostNextPhase() {
-            if(phase === 'night') resolveNight();
-            else if(phase === 'day') resolveDay();
-        }
-
-        function startNight() {
-            phase = 'night';
-            actions = { votes: {} };
-            broadcastState("Night falls. Mafia awake.");
+        function nextPhase() {
+            if(gameState.phase === 'intro') {
+                runPhase('night');
+            } else if (gameState.phase === 'night') {
+                resolveNight();
+            } else if (gameState.phase === 'day') {
+                resolveDay();
+            }
         }
 
         function resolveNight() {
-            let msg = "Night is over. ";
-            const victimId = actions.mafia;
-            const saveId = actions.doctor;
-
-            if(victimId) {
-                if(victimId === saveId) msg += "Someone was saved!";
-                else {
-                    const victim = players.find(p => p.id === victimId);
+            let msg = "SUNRISE. ";
+            const mafiaTarget = gameState.actions.mafia;
+            const docTarget = gameState.actions.doctor;
+            
+            // Logic
+            if(mafiaTarget) {
+                if(mafiaTarget === docTarget) {
+                    msg += "ATTACK INTERCEPTED. TARGET STABILIZED.";
+                } else {
+                    const victim = players.find(p => p.id === mafiaTarget);
                     if(victim) {
                         victim.isAlive = false;
-                        msg += `${victim.name} has died.`;
+                        msg += `CASUALTY REPORT: ${victim.name} ELIMINATED.`;
                     }
                 }
             } else {
-                msg += "It was peaceful.";
+                msg += "NO HOSTILE ACTIVITY DETECTED.";
             }
 
-            if(checkWin()) return;
-            startDay(msg);
-        }
-
-        function startDay(msg) {
-            phase = 'day';
-            actions = { votes: {} };
-            broadcastState(msg);
+            if(checkWinCondition()) return;
+            runPhase('day');
+            // Send alert after phase change so UI updates first
+            setTimeout(() => broadcastAlert(msg), 500);
         }
 
         function resolveDay() {
             // Count votes
-            let counts = {};
-            Object.values(actions.votes).forEach(t => counts[t] = (counts[t]||0)+1);
+            const counts = {};
+            Object.values(gameState.actions.votes).forEach(t => counts[t] = (counts[t] || 0) + 1);
             
             let max = 0;
             let elimId = null;
@@ -356,56 +428,117 @@
                 if(c > max) { max = c; elimId = id; }
             }
 
-            let msg = "No one was voted out.";
-            if(elimId && max > 1) { // Simple majorityish
-                const p = players.find(x => x.id === elimId);
-                p.isAlive = false;
-                msg = `${p.name} was voted out.`;
+            let msg = "VOTE INCONCLUSIVE.";
+            // Require at least 2 votes to kill
+            if(elimId && max > 1) {
+                const victim = players.find(p => p.id === elimId);
+                if(victim) {
+                    victim.isAlive = false;
+                    msg = `CREW DECISION: ${victim.name} EJECTED.`;
+                }
             }
 
-            if(checkWin()) return;
-            broadcastState(msg);
-            setTimeout(() => startNight(), 3000);
+            if(checkWinCondition()) return;
+            
+            gameState.dayCount++;
+            runPhase('night');
+            setTimeout(() => broadcastAlert(msg), 500);
         }
 
-        function checkWin() {
-            const mafia = players.filter(p => p.isAlive && p.role === 'Mafia').length;
-            const good = players.filter(p => p.isAlive && p.role !== 'Mafia').length;
-            
-            if(mafia === 0) { endGame("VILLAGERS WIN"); return true; }
-            if(mafia >= good) { endGame("MAFIA WINS"); return true; }
+        function checkWinCondition() {
+            const mafiaCount = players.filter(p => p.isAlive && p.role === 'Mafia').length;
+            const villagerCount = players.filter(p => p.isAlive && p.role !== 'Mafia').length;
+
+            if(mafiaCount === 0) {
+                endGame("VILLAGERS WIN - SECTOR SECURE");
+                return true;
+            }
+            if(mafiaCount >= villagerCount) {
+                endGame("MAFIA WINS - SECTOR COMPROMISED");
+                return true;
+            }
             return false;
         }
 
-        function endGame(res) {
-            phase = 'gameover';
-            broadcastState(res);
+        function endGame(result) {
+            gameState.phase = 'gameover';
+            broadcastState(result);
+            broadcastAlert(result);
         }
 
-        function broadcastState(toastMsg = null) {
-            // Clean state for clients (Hide roles)
+        function handleGameAction(actorId, targetId) {
+            if(gameState.phase === 'gameover') return;
+
+            const actor = players.find(p => p.id === actorId);
+            if(!actor || !actor.isAlive) return;
+
+            if(gameState.phase === 'night') {
+                if(actor.role === 'Mafia') {
+                    gameState.actions.mafia = targetId;
+                }
+                if(actor.role === 'Doctor') {
+                    // DOCTOR CONSTRAINT: Cannot heal same person twice in a row
+                    if(actor.lastHealedRound === gameState.dayCount && actor.lastHealedTarget === targetId) {
+                        sendPrivate(actorId, "ERROR: RECHARGE CYCLE ACTIVE (1 ROUND)");
+                        return;
+                    }
+                    gameState.actions.doctor = targetId;
+                    actor.lastHealedRound = gameState.dayCount; // Mark round
+                    actor.lastHealedTarget = targetId; // Mark target
+                }
+                if(actor.role === 'Detective') {
+                    const target = players.find(p => p.id === targetId);
+                    const isMafia = target.role === 'Mafia';
+                    sendPrivate(actorId, `SCAN RESULT: ${target.name} is ${isMafia ? 'HOSTILE' : 'FRIENDLY'}`);
+                }
+            } else if (gameState.phase === 'day') {
+                gameState.actions.votes[actorId] = targetId;
+            }
+        }
+
+        // --- NETWORKING UTILS ---
+        function broadcastState(alertMsg = null) {
             const publicPlayers = players.map(p => ({
-                id: p.id, name: p.name, isAlive: p.isAlive, avatarIdx: p.avatarIdx,
-                // Only send votes during day to visualize
-                voteCount: phase === 'day' ? Object.values(actions.votes).filter(v => v === p.id).length : 0
+                id: p.id, name: p.name, isAlive: p.isAlive
             }));
-
-            const state = { type: 'update', players: publicPlayers, phase, toast: toastMsg };
-
+            const payload = {
+                type: 'state',
+                players: publicPlayers,
+                phase: gameState.phase,
+                timer: gameState.timer,
+                day: gameState.dayCount,
+                alert: alertMsg
+            };
+            
             // Update Host UI
-            renderGame(state, players.find(p=>p.id===myId).role);
-            if(toastMsg) showToast(toastMsg);
+            updateGameUI(payload, players.find(p=>p.id===myId).role);
+            if(alertMsg) showAlert(alertMsg);
 
-            // Send to Clients
             connections.forEach(c => {
                 const p = players.find(x => x.id === c.peer);
-                const pRole = p ? p.role : 'Spectator';
-                c.send({ ...state, myRole: pRole });
+                c.send({ ...payload, myRole: p ? p.role : 'Spectator' });
             });
         }
 
+        function broadcastTimer() {
+            const data = { type: 'timer', time: gameState.timer };
+            updateTimerUI(gameState.timer);
+            connections.forEach(c => c.send(data));
+        }
+
+        function broadcastAlert(msg) {
+            showAlert(msg);
+            connections.forEach(c => c.send({ type: 'alert', msg }));
+        }
+
+        function broadcastChat(name, msg) {
+            const data = { type: 'chat', name, msg };
+            addLog(name, msg);
+            connections.forEach(c => c.send(data));
+        }
+
         function sendPrivate(targetId, msg) {
-            if(targetId === myId) alert(msg);
+            if(targetId === myId) showAlert(msg);
             else {
                 const c = connections.find(x => x.peer === targetId);
                 if(c) c.send({ type: 'alert', msg });
@@ -414,26 +547,28 @@
 
         // --- CLIENT LOGIC ---
         function joinGame() {
-            myName = document.getElementById('username').value.trim() || "Guest";
+            myName = document.getElementById('username').value.trim() || "CADET";
             const hostId = document.getElementById('join-id').value.trim();
             if(!hostId) return;
 
             initPeer((id) => {
                 conn = peer.connect(hostId);
                 conn.on('open', () => {
-                    document.getElementById('status-msg').innerText = "Connected. Waiting for host...";
+                    document.getElementById('menu-status').innerText = "UPLINK SECURE.";
                     conn.send({ type: 'join', name: myName });
                 });
                 conn.on('data', data => {
-                    if(data.type === 'update') {
+                    if(data.type === 'state') {
                         if(document.getElementById('screen-game').classList.contains('hidden')) {
                             document.getElementById('screen-menu').classList.add('hidden');
                             document.getElementById('screen-game').classList.remove('hidden');
                         }
-                        renderGame(data, data.myRole);
-                        if(data.toast) showToast(data.toast);
+                        updateGameUI(data, data.myRole);
+                        if(data.alert) showAlert(data.alert);
                     }
-                    if(data.type === 'alert') alert(data.msg);
+                    else if (data.type === 'timer') updateTimerUI(data.time);
+                    else if (data.type === 'alert') showAlert(data.msg);
+                    else if (data.type === 'chat') addLog(data.name, data.msg);
                 });
             });
         }
@@ -441,97 +576,96 @@
         // --- RENDERER ---
         let selectedTarget = null;
 
-        function renderGame(state, myRole) {
-            // Update Phase UI
-            const ban = document.getElementById('phase-banner');
-            const sub = document.getElementById('phase-sub');
-            const btn = document.getElementById('action-btn');
-            
-            ban.innerText = state.phase.toUpperCase();
-            document.getElementById('my-role').innerText = myRole;
+        function updateGameUI(state, myRole) {
+            document.getElementById('day-counter').innerText = `CYCLE ${state.day}`;
+            document.getElementById('role-badge').innerText = myRole;
+            document.getElementById('phase-display').innerText = state.phase.toUpperCase();
+            updateTimerUI(state.timer);
 
-            if(state.phase === 'night') {
-                ban.style.backgroundColor = '#2c3e50';
-                sub.innerText = "Mafia kill, Doctor save, Detective check.";
-                btn.innerText = "SUBMIT NIGHT ACTION";
-            } else if(state.phase === 'day') {
-                ban.style.backgroundColor = '#f39c12';
-                sub.innerText = "Discuss and Vote.";
-                btn.innerText = "VOTE TO ELIMINATE";
-            } else {
-                ban.style.backgroundColor = '#c0392b';
-                sub.innerText = "Game Over";
-                btn.disabled = true;
-            }
-
-            // Render Grid
-            const grid = document.getElementById('players-grid');
-            grid.innerHTML = '';
+            // Render Circular Layout
+            const orbit = document.getElementById('orbit-container');
+            orbit.innerHTML = '';
             
-            state.players.forEach(p => {
-                const isMe = p.id === myId;
-                const wrapper = document.createElement('div');
-                wrapper.className = 'avatar-wrapper';
+            const total = state.players.length;
+            const radius = 150; // Distance from center (px) - mobile friendly approx
+            
+            state.players.forEach((p, index) => {
+                // Math for circle
+                const angle = (index / total) * 2 * Math.PI - (Math.PI/2); // Start at top
+                const x = 50 + (35 * Math.cos(angle)); // % units for responsiveness
+                const y = 50 + (35 * Math.sin(angle));
                 
-                // Color generation
-                const color = COLORS[p.avatarIdx % COLORS.length];
-                const letter = p.name.substring(0, 1).toUpperCase();
+                const node = document.createElement('div');
+                node.className = `player-node ${p.isAlive ? 'alive' : 'dead'} ${selectedTarget === p.id ? 'selected' : ''}`;
+                node.style.left = `${x}%`;
+                node.style.top = `${y}%`;
                 
-                const deadClass = p.isAlive ? '' : 'dead';
-                const selClass = (selectedTarget === p.id) ? 'selected' : '';
-                
-                wrapper.innerHTML = `
-                    <div class="avatar ${deadClass} ${selClass}" 
-                         style="background-color: ${color};" 
-                         onclick="selectPlayer('${p.id}', ${p.isAlive})">
-                        ${letter}
+                node.innerHTML = `
+                    <div class="node-circle" onclick="clickPlayer('${p.id}', ${p.isAlive})">
+                        ${p.name.charAt(0).toUpperCase()}
                     </div>
-                    <div class="p-name">${p.name} ${isMe ? '(YOU)' : ''}</div>
-                    <div class="p-votes">${phase === 'day' && p.voteCount > 0 ? '•'.repeat(p.voteCount) : ''}</div>
+                    <div class="node-name">${p.name}</div>
                 `;
-                grid.appendChild(wrapper);
+                orbit.appendChild(node);
             });
         }
 
-        function selectPlayer(id, isAlive) {
+        function updateTimerUI(time) {
+            document.getElementById('timer-display').innerText = time;
+            if(time <= 5) document.getElementById('timer-display').style.color = "var(--neon-red)";
+            else document.getElementById('timer-display').style.color = "#fff";
+        }
+
+        function clickPlayer(id, isAlive) {
             if(!isAlive) return;
             selectedTarget = id;
-            // Re-trigger render to update selection visuals (lazy way)
-            document.querySelectorAll('.avatar').forEach(el => el.classList.remove('selected'));
-            // Find specific element to add class is hard without re-render, 
-            // but in real app we update state. Here we just visually update current DOM.
-            const wrappers = document.querySelectorAll('.avatar-wrapper');
-            // This is a quick hack to highlight without waiting for server roundtrip
-            // In a real framework (React/Vue) this would be state-driven
-            const allAvatars = document.querySelectorAll('.avatar');
-            // Reset
-            allAvatars.forEach(a => a.classList.remove('selected'));
-            // Set
-            event.currentTarget.classList.add('selected');
+            // Visual Update locally immediately
+            document.querySelectorAll('.player-node').forEach(el => el.classList.remove('selected'));
+            // This is a dirty hack to re-highlight without waiting for server, relies on DOM structure
+            // In production, use React/Vue. Here we just wait for next tick or user interaction.
+            // But let's send the action immediately.
+            submitAction(id);
         }
 
-        function submitAction() {
-            if(!selectedTarget) return showToast("SELECT A PLAYER");
+        function submitAction(targetId) {
+            if(isHost) handleGameAction(myId, targetId);
+            else conn.send({ type: 'action', payload: targetId });
             
-            if(isHost) processAction(myId, selectedTarget);
-            else conn.send({ type: 'action', targetId: selectedTarget });
-            
-            showToast("ACTION SENT");
-            selectedTarget = null;
-            document.querySelectorAll('.avatar').forEach(a => a.classList.remove('selected'));
+            // Highlight visually (simple way)
+            // Note: In a real app we'd wait for state update, but here we want instant feedback
         }
 
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.innerText = msg;
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 3000);
+        // --- CHAT & UTILS ---
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if(!msg) return;
+            
+            if(isHost) broadcastChat(myName, msg);
+            else conn.send({ type: 'chat', name: myName, msg: msg });
+            
+            input.value = "";
+        }
+
+        function addLog(name, msg) {
+            const log = document.getElementById('chat-log');
+            const entry = document.createElement('div');
+            entry.className = 'chat-msg';
+            entry.innerHTML = `<span style="color:var(--neon-green)">${name}:</span> ${msg}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function showAlert(msg) {
+            const el = document.getElementById('alert-overlay');
+            el.innerText = msg;
+            el.style.opacity = 1;
+            setTimeout(() => el.style.opacity = 0, 4000);
         }
 
         function copyId() {
             const txt = document.getElementById('lobby-id').innerText;
-            navigator.clipboard.writeText(txt);
-            showToast("ID COPIED");
+            navigator.clipboard.writeText(txt).then(() => alert("ID COPIED"));
         }
     </script>
 </body>
