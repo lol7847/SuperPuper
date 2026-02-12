@@ -13,7 +13,6 @@
             --neon-green: #00ff9d;
             --neon-gold: #ffcc00;
             --bg-dark: #050510;
-            --glass: rgba(0, 20, 40, 0.7);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -26,16 +25,17 @@
             height: 100vh; display: flex; flex-direction: column;
         }
 
-        /* --- UI UTILS --- */
         .hidden { display: none !important; }
-        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; margin: 0; letter-spacing: 2px; }
-        
+        h1, h2 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; margin: 0; letter-spacing: 2px; }
+
+        /* --- BUTTONS & INPUTS --- */
         button {
             background: rgba(0, 243, 255, 0.1); border: 1px solid var(--neon-blue);
             color: var(--neon-blue); padding: 12px 24px; font-family: 'Orbitron';
-            cursor: pointer; transition: 0.3s; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+            cursor: pointer; transition: 0.3s; 
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
         }
-        button:hover { background: var(--neon-blue); color: #000; box-shadow: 0 0 15px var(--neon-blue); }
+        button:active { transform: scale(0.95); background: var(--neon-blue); color: black; }
         button:disabled { border-color: #333; color: #555; pointer-events: none; }
 
         input {
@@ -51,10 +51,7 @@
             background: var(--bg-dark); z-index: 10; transition: opacity 0.5s;
         }
 
-        /* --- GAME LAYOUT --- */
-        #game-ui { position: relative; width: 100%; height: 100%; overflow: hidden; }
-
-        /* HEADER INFO */
+        /* --- GAME UI --- */
         .top-bar {
             position: absolute; top: 0; left: 0; width: 100%; padding: 15px;
             display: flex; justify-content: space-between; align-items: center;
@@ -67,11 +64,11 @@
             background: rgba(0,0,0,0.8); pointer-events: auto;
         }
 
-        /* CENTER TABLE (REACTOR) */
+        /* CENTER REACTOR */
         .table-container {
-            position: absolute; top: 50%; left: 50%;
+            position: absolute; top: 45%; left: 50%; /* Shifted up slightly */
             transform: translate(-50%, -50%);
-            width: 300px; height: 300px;
+            width: 280px; height: 280px;
             border-radius: 50%;
             border: 2px dashed var(--neon-blue);
             box-shadow: 0 0 50px rgba(0, 243, 255, 0.2);
@@ -81,27 +78,19 @@
         }
         @keyframes spin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
 
-        /* STATIONARY INFO INSIDE TABLE */
         .reactor-core {
-            position: absolute; top: 50%; left: 50%;
+            position: absolute; top: 45%; left: 50%;
             transform: translate(-50%, -50%);
-            text-align: center; z-index: 4;
-            width: 200px;
+            text-align: center; z-index: 4; width: 200px;
         }
-        #timer-display { font-size: 4rem; color: #fff; text-shadow: 0 0 20px #fff; font-family: 'Orbitron'; }
-        #phase-display { font-size: 1.2rem; color: var(--neon-green); letter-spacing: 3px; }
+        #timer-display { font-size: 3.5rem; color: #fff; text-shadow: 0 0 20px #fff; font-family: 'Orbitron'; }
+        #phase-display { font-size: 1rem; color: var(--neon-green); letter-spacing: 2px; margin-top: 5px;}
 
-        /* PLAYERS ORBIT */
-        .player-orbit {
-            position: absolute; width: 100%; height: 100%;
-            top: 0; left: 0; pointer-events: none;
-        }
+        /* PLAYERS */
+        .player-orbit { position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; }
         .player-node {
-            position: absolute; width: 80px; height: 80px;
-            /* Centering logic handled in JS */
-            transform: translate(-50%, -50%);
-            pointer-events: auto; cursor: pointer;
-            display: flex; flex-direction: column; align-items: center;
+            position: absolute; width: 80px; height: 80px; transform: translate(-50%, -50%);
+            pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; align-items: center;
             transition: 0.3s;
         }
         .node-circle {
@@ -110,63 +99,60 @@
             display: flex; align-items: center; justify-content: center;
             font-weight: bold; font-size: 1.5rem; color: #555;
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            position: relative;
         }
         .player-node.alive .node-circle { border-color: var(--neon-blue); color: #fff; box-shadow: 0 0 15px var(--neon-blue); }
         .player-node.dead .node-circle { border-color: var(--neon-red); color: var(--neon-red); opacity: 0.5; }
         .player-node.selected .node-circle { background: var(--neon-gold); color: #000; box-shadow: 0 0 25px var(--neon-gold); }
-        
-        .node-name { margin-top: 5px; font-size: 0.8rem; text-shadow: 0 0 5px #000; background: rgba(0,0,0,0.6); padding: 2px 5px; }
+        .node-name { margin-top: 5px; font-size: 0.8rem; background: rgba(0,0,0,0.8); padding: 2px 5px; }
 
-        /* CHAT MODULE */
-        .comms-panel {
-            position: absolute; bottom: 0; left: 0; width: 100%; height: 25%;
-            background: rgba(0, 10, 20, 0.9); border-top: 1px solid var(--neon-blue);
-            display: flex; flex-direction: column;
-            z-index: 20;
+        /* SHERIFF INTEL PANEL (Left Bottom) */
+        .intel-panel {
+            position: absolute; bottom: 80px; left: 10px;
+            width: 180px; background: rgba(0, 20, 0, 0.8);
+            border: 1px solid var(--neon-green);
+            padding: 10px; font-family: 'Orbitron'; font-size: 0.8rem;
+            display: none; z-index: 20;
         }
-        .chat-log { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 0.9rem; text-align: left; }
-        .chat-entry { display: flex; border-top: 1px solid #333; }
-        .chat-entry input { width: 100%; margin: 0; border: none; padding: 10px; text-align: left; }
-        .chat-msg { margin-bottom: 4px; }
-        .sys-msg { color: var(--neon-gold); font-style: italic; }
+        .intel-title { color: var(--neon-green); border-bottom: 1px solid var(--neon-green); margin-bottom: 5px; }
+        .intel-row { display: flex; justify-content: space-between; margin-bottom: 3px; }
+        .status-unknown { color: #555; }
+        .status-mafia { color: var(--neon-red); }
+        .status-innocent { color: var(--neon-blue); }
 
-        /* VOICE BUTTON */
-        #voice-btn {
-            position: absolute; bottom: 26%; right: 10px;
-            width: 50px; height: 50px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px; padding: 0; z-index: 25;
-            background: #000; border-color: var(--neon-green);
+        /* CONFIRM BUTTON (Bottom Center) */
+        #confirm-btn {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 200px; height: 60px; font-size: 1.2rem; font-weight: bold;
+            background: #000; border: 2px solid var(--neon-gold); color: var(--neon-gold);
+            z-index: 30; display: none;
         }
-        #voice-btn.active { background: var(--neon-green); color: #000; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0,255,157, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(0,255,157, 0); } 100% { box-shadow: 0 0 0 0 rgba(0,255,157, 0); } }
+        #confirm-btn:hover { background: var(--neon-gold); color: #000; }
 
         /* OVERLAYS */
         .overlay-msg {
-            position: absolute; top: 30%; width: 100%; text-align: center;
-            font-size: 2rem; color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red);
-            pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 30;
+            position: absolute; top: 20%; width: 100%; text-align: center;
+            font-size: 1.5rem; color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red);
+            pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 40;
         }
     </style>
 </head>
 <body>
 
-    <!-- 1. MAIN MENU -->
+    <!-- MAIN MENU -->
     <div id="screen-menu" class="screen">
-        <h1 style="font-size: 3rem; color: var(--neon-blue); text-shadow: 0 0 20px var(--neon-blue);">MAFIA 2077</h1>
+        <h1 style="font-size: 2.5rem; color: var(--neon-blue);">MAFIA // SECTOR 7</h1>
         <br>
         <input type="text" id="username" placeholder="IDENTIFICATION" maxlength="12">
         <br>
         <button onclick="initHost()">INITIALIZE HOST</button>
         <div style="margin: 20px 0; display:flex; gap:10px;">
             <input type="text" id="join-id" placeholder="UPLINK ID" style="margin:0; width: 150px;">
-            <button onclick="joinGame()" style="padding: 10px;">CONNECT</button>
+            <button onclick="joinGame()">CONNECT</button>
         </div>
         <p id="menu-status" style="color: var(--neon-gold); font-size: 0.8rem;"></p>
     </div>
 
-    <!-- 2. LOBBY -->
+    <!-- LOBBY -->
     <div id="screen-lobby" class="screen hidden">
         <h2>PRE-FLIGHT CHECK</h2>
         <div style="background: #000; padding: 10px; border: 1px dashed var(--neon-blue); cursor: pointer;" onclick="copyId()">
@@ -174,72 +160,68 @@
         </div>
         <div id="lobby-list" style="margin: 30px 0; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;"></div>
         <button id="start-btn" onclick="startGame()" disabled>ENGAGE SEQUENCE</button>
-        <p>WAITING FOR CREW (MIN 3)</p>
+        <p>WAITING FOR CREW (MIN 4)</p>
     </div>
 
-    <!-- 3. GAME UI -->
-    <div id="screen-game" class="screen hidden" style="display: block;">
-        
+    <!-- GAME UI -->
+    <div id="screen-game" class="screen hidden">
         <div class="top-bar">
-            <div>SECTOR 7 // <span id="day-counter">DAY 1</span></div>
+            <div><span id="day-counter">DAY 1</span></div>
             <div id="role-badge" class="role-badge">LOADING...</div>
         </div>
 
         <div class="overlay-msg" id="alert-overlay">SYSTEM ALERT</div>
 
-        <!-- CENTER TABLE -->
         <div class="table-container"></div>
-        
-        <!-- STATIONARY CENTER -->
         <div class="reactor-core">
             <div id="timer-display">00</div>
             <div id="phase-display">STANDBY</div>
         </div>
 
-        <!-- PLAYERS -->
         <div id="orbit-container" class="player-orbit"></div>
 
-        <!-- VOICE TOGGLE -->
-        <button id="voice-btn" onclick="toggleVoice()">🎤</button>
-
-        <!-- CHAT -->
-        <div class="comms-panel">
-            <div id="chat-log" class="chat-log"></div>
-            <div class="chat-entry">
-                <input type="text" id="chat-input" placeholder="TRANSMIT MESSAGE..." onkeydown="if(event.key==='Enter') sendChat()">
-                <button onclick="sendChat()" style="width: auto; padding: 0 20px;">></button>
-            </div>
+        <!-- SHERIFF INTEL LIST -->
+        <div id="intel-panel" class="intel-panel">
+            <div class="intel-title">SCAN RESULTS</div>
+            <div id="intel-list"></div>
         </div>
+
+        <!-- ACTION BUTTON -->
+        <button id="confirm-btn" onclick="confirmAction()">ENGAGE</button>
     </div>
 
     <script>
-        // --- CONSTANTS & CONFIG ---
-        const ROLES = ['Mafia', 'Doctor', 'Detective', 'Villager', 'Villager', 'Mafia', 'Villager', 'Villager'];
+        // --- CONFIG ---
+        const ROLES_DECK = ['Mafia', 'Doctor', 'Detective', 'Villager', 'Villager', 'Mafia', 'Villager', 'Villager'];
         const TIMERS = {
             INTRO: 5,
-            NIGHT: 20,
+            MAFIA: 15,
+            DETECTIVE: 15,
+            DOCTOR: 15,
             DAY: 45
         };
 
-        // --- GLOBAL STATE ---
+        // --- STATE ---
         let peer, conn;
         let myId, myName;
         let isHost = false;
-        let connections = []; // Host only
-        let myStream = null;  // Audio
+        let connections = [];
+        let myRole = "";
         
-        // Game State
-        let players = []; // { id, name, role, isAlive, lastHealedRound }
+        let players = []; 
+        let intelMap = {}; // Local Sheriff storage: { id: "Mafia" | "Innocent" | "?" }
+
         let gameState = {
-            phase: 'lobby', // lobby, intro, night, day, gameover
+            phase: 'lobby', // intro, mafia_turn, detective_turn, doctor_turn, day
             timer: 0,
             dayCount: 1,
-            actions: {} // { mafia: id, doctor: id, detective: id, votes: { voterId: targetId } }
+            actions: {} // Temporary storage for the round
         };
         
-        let interval = null;
+        let selectedTarget = null;
+        let hostInterval = null;
 
-        // --- PEERJS SETUP ---
+        // --- NETWORKING ---
         function initPeer(cb) {
             document.getElementById('menu-status').innerText = "ESTABLISHING UPLINK...";
             peer = new Peer();
@@ -248,42 +230,7 @@
                 document.getElementById('menu-status').innerText = "";
                 cb(id);
             });
-            peer.on('error', err => alert("UPLINK FAILED: " + err.type));
-            
-            // Voice handling (Receiver)
-            peer.on('call', (call) => {
-                call.answer(myStream); // Answer with our stream if available
-                call.on('stream', remoteStream => {
-                    const audio = new Audio();
-                    audio.srcObject = remoteStream;
-                    audio.play();
-                });
-            });
-        }
-
-        // --- VOICE CHAT (BASIC) ---
-        async function toggleVoice() {
-            const btn = document.getElementById('voice-btn');
-            if(myStream) {
-                // Mute/Stop
-                myStream.getTracks().forEach(t => t.stop());
-                myStream = null;
-                btn.classList.remove('active');
-            } else {
-                try {
-                    myStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    btn.classList.add('active');
-                    // In a mesh network, we'd call everyone. 
-                    // Simplified: Call Host if client, Call everyone if Host.
-                    if(!isHost && conn) {
-                        peer.call(conn.peer, myStream);
-                    } else if(isHost) {
-                        connections.forEach(c => peer.call(c.peer, myStream));
-                    }
-                } catch(e) {
-                    alert("MICROPHONE ACCESS DENIED");
-                }
-            }
+            peer.on('error', err => alert("ERROR: " + err.type));
         }
 
         // --- HOST LOGIC ---
@@ -294,8 +241,7 @@
                 document.getElementById('screen-menu').classList.add('hidden');
                 document.getElementById('screen-lobby').classList.remove('hidden');
                 document.getElementById('lobby-id').innerText = id;
-                
-                players.push({ id: myId, name: myName, role: null, isAlive: true, lastHealedRound: 0 });
+                players.push({ id: myId, name: myName, role: null, isAlive: true, lastHealed: null });
                 updateLobby();
 
                 peer.on('connection', (c) => {
@@ -313,217 +259,188 @@
 
         function handleHostData(data, senderId) {
             if(data.type === 'join') {
-                players.push({ id: senderId, name: data.name, role: null, isAlive: true, lastHealedRound: 0 });
+                players.push({ id: senderId, name: data.name, role: null, isAlive: true, lastHealed: null });
                 updateLobby();
                 broadcastState();
             } else if (data.type === 'action') {
-                handleGameAction(senderId, data.payload);
-            } else if (data.type === 'chat') {
-                broadcastChat(data.name, data.msg);
+                processAction(senderId, data.targetId);
             }
         }
 
         function updateLobby() {
-            const list = document.getElementById('lobby-list');
-            list.innerHTML = players.map(p => `<div style="background:#111; color:var(--neon-blue); padding:5px 10px; border:1px solid var(--neon-blue);">${p.name}</div>`).join('');
-            document.getElementById('start-btn').disabled = players.length < 3;
+            document.getElementById('lobby-list').innerHTML = players.map(p => 
+                `<div style="border:1px solid #0ff; padding:5px; font-size:0.8rem;">${p.name}</div>`
+            ).join('');
+            document.getElementById('start-btn').disabled = players.length < 4;
         }
 
         function startGame() {
-            if(players.length < 3) return;
-            // Assign Roles
-            let deck = ROLES.slice(0, players.length).sort(() => Math.random() - 0.5);
+            if(players.length < 4) return;
+            // Assign roles
+            let deck = ROLES_DECK.slice(0, players.length).sort(() => Math.random() - 0.5);
             players.forEach((p, i) => p.role = deck[i]);
             
             document.getElementById('screen-lobby').classList.add('hidden');
             document.getElementById('screen-game').classList.remove('hidden');
             
-            // START LOOP
+            gameState.dayCount = 1;
             runPhase('intro');
         }
 
-        // --- GAME LOOP (HOST) ---
         function runPhase(phase) {
             gameState.phase = phase;
-            gameState.actions = { votes: {} }; // Reset actions
-            
-            let duration = 0;
+            let duration = 5;
             let msg = "";
 
-            if(phase === 'intro') {
-                duration = TIMERS.INTRO;
-                msg = "INITIALIZING SEQUENCE...";
-            } else if (phase === 'night') {
-                duration = TIMERS.NIGHT;
-                msg = "NIGHT CYCLE. ROLES ENGAGE.";
-            } else if (phase === 'day') {
-                duration = TIMERS.DAY;
-                msg = "DAY CYCLE. DELIBERATE.";
+            // Phase Config
+            switch(phase) {
+                case 'intro': duration = TIMERS.INTRO; msg = "INITIALIZING..."; break;
+                case 'mafia_turn': duration = TIMERS.MAFIA; msg = "MAFIA TARGETING"; break;
+                case 'detective_turn': duration = TIMERS.DETECTIVE; msg = "DETECTIVE SCANNING"; break;
+                case 'doctor_turn': duration = TIMERS.DOCTOR; msg = "MEDICAL ASSISTANCE"; break;
+                case 'day': duration = TIMERS.DAY; msg = "DAY CYCLE: VOTE"; break;
+            }
+
+            // Clean up old actions if starting a new night sequence
+            if(phase === 'mafia_turn') {
+                gameState.actions = { votes: {} }; 
             }
 
             gameState.timer = duration;
             broadcastState(msg);
 
-            // Timer Logic
-            if(interval) clearInterval(interval);
-            interval = setInterval(() => {
+            if(hostInterval) clearInterval(hostInterval);
+            hostInterval = setInterval(() => {
                 gameState.timer--;
-                
-                // Sync timer occasionally to keep clients aligned without spamming
-                if(gameState.timer % 5 === 0 || gameState.timer <= 5) {
-                    broadcastTimer();
-                }
-
                 if(gameState.timer <= 0) {
-                    clearInterval(interval);
+                    clearInterval(hostInterval);
                     nextPhase();
+                } else if (gameState.timer % 5 === 0) {
+                    broadcastTimer();
                 }
             }, 1000);
         }
 
         function nextPhase() {
-            if(gameState.phase === 'intro') {
-                runPhase('night');
-            } else if (gameState.phase === 'night') {
-                resolveNight();
-            } else if (gameState.phase === 'day') {
-                resolveDay();
+            const p = gameState.phase;
+            if(p === 'intro') runPhase('mafia_turn');
+            else if(p === 'mafia_turn') runPhase('detective_turn');
+            else if(p === 'detective_turn') runPhase('doctor_turn');
+            else if(p === 'doctor_turn') {
+                resolveNightResults();
             }
+            else if(p === 'day') resolveDayResults();
         }
 
-        function resolveNight() {
-            let msg = "SUNRISE. ";
-            const mafiaTarget = gameState.actions.mafia;
-            const docTarget = gameState.actions.doctor;
-            
-            // Logic
-            if(mafiaTarget) {
-                if(mafiaTarget === docTarget) {
-                    msg += "ATTACK INTERCEPTED. TARGET STABILIZED.";
-                } else {
-                    const victim = players.find(p => p.id === mafiaTarget);
-                    if(victim) {
-                        victim.isAlive = false;
-                        msg += `CASUALTY REPORT: ${victim.name} ELIMINATED.`;
-                    }
-                }
-            } else {
-                msg += "NO HOSTILE ACTIVITY DETECTED.";
-            }
-
-            if(checkWinCondition()) return;
-            runPhase('day');
-            // Send alert after phase change so UI updates first
-            setTimeout(() => broadcastAlert(msg), 500);
-        }
-
-        function resolveDay() {
-            // Count votes
-            const counts = {};
-            Object.values(gameState.actions.votes).forEach(t => counts[t] = (counts[t] || 0) + 1);
-            
-            let max = 0;
-            let elimId = null;
-            for(const [id, c] of Object.entries(counts)) {
-                if(c > max) { max = c; elimId = id; }
-            }
-
-            let msg = "VOTE INCONCLUSIVE.";
-            // Require at least 2 votes to kill
-            if(elimId && max > 1) {
-                const victim = players.find(p => p.id === elimId);
-                if(victim) {
-                    victim.isAlive = false;
-                    msg = `CREW DECISION: ${victim.name} EJECTED.`;
-                }
-            }
-
-            if(checkWinCondition()) return;
-            
-            gameState.dayCount++;
-            runPhase('night');
-            setTimeout(() => broadcastAlert(msg), 500);
-        }
-
-        function checkWinCondition() {
-            const mafiaCount = players.filter(p => p.isAlive && p.role === 'Mafia').length;
-            const villagerCount = players.filter(p => p.isAlive && p.role !== 'Mafia').length;
-
-            if(mafiaCount === 0) {
-                endGame("VILLAGERS WIN - SECTOR SECURE");
-                return true;
-            }
-            if(mafiaCount >= villagerCount) {
-                endGame("MAFIA WINS - SECTOR COMPROMISED");
-                return true;
-            }
-            return false;
-        }
-
-        function endGame(result) {
-            gameState.phase = 'gameover';
-            broadcastState(result);
-            broadcastAlert(result);
-        }
-
-        function handleGameAction(actorId, targetId) {
-            if(gameState.phase === 'gameover') return;
-
+        function processAction(actorId, targetId) {
             const actor = players.find(p => p.id === actorId);
             if(!actor || !actor.isAlive) return;
 
-            if(gameState.phase === 'night') {
-                if(actor.role === 'Mafia') {
-                    gameState.actions.mafia = targetId;
+            const p = gameState.phase;
+            
+            if(p === 'mafia_turn' && actor.role === 'Mafia') {
+                gameState.actions.mafia = targetId;
+            }
+            else if(p === 'detective_turn' && actor.role === 'Detective') {
+                const target = players.find(p => p.id === targetId);
+                const result = (target.role === 'Mafia') ? 'MAFIA' : 'INNOCENT';
+                sendPrivate(actorId, { type: 'intel', targetId: targetId, status: result });
+            }
+            else if(p === 'doctor_turn' && actor.role === 'Doctor') {
+                // Rule: Cannot heal same person twice in a row
+                if(actor.lastHealed === targetId) {
+                    sendPrivate(actorId, { type: 'alert', msg: "COOLDOWN: CANNOT HEAL SAME TARGET" });
+                    return;
                 }
-                if(actor.role === 'Doctor') {
-                    // DOCTOR CONSTRAINT: Cannot heal same person twice in a row
-                    if(actor.lastHealedRound === gameState.dayCount && actor.lastHealedTarget === targetId) {
-                        sendPrivate(actorId, "ERROR: RECHARGE CYCLE ACTIVE (1 ROUND)");
-                        return;
-                    }
-                    gameState.actions.doctor = targetId;
-                    actor.lastHealedRound = gameState.dayCount; // Mark round
-                    actor.lastHealedTarget = targetId; // Mark target
-                }
-                if(actor.role === 'Detective') {
-                    const target = players.find(p => p.id === targetId);
-                    const isMafia = target.role === 'Mafia';
-                    sendPrivate(actorId, `SCAN RESULT: ${target.name} is ${isMafia ? 'HOSTILE' : 'FRIENDLY'}`);
-                }
-            } else if (gameState.phase === 'day') {
+                gameState.actions.doctor = targetId;
+                actor.lastHealed = targetId;
+            }
+            else if(p === 'day') {
                 gameState.actions.votes[actorId] = targetId;
             }
         }
 
-        // --- NETWORKING UTILS ---
-        function broadcastState(alertMsg = null) {
-            const publicPlayers = players.map(p => ({
-                id: p.id, name: p.name, isAlive: p.isAlive
-            }));
+        function resolveNightResults() {
+            let msg = "SUNRISE. ";
+            const killId = gameState.actions.mafia;
+            const saveId = gameState.actions.doctor;
+
+            if(killId) {
+                if(killId === saveId) {
+                    msg += "ATTACK BLOCKED BY MEDIC.";
+                } else {
+                    const victim = players.find(p => p.id === killId);
+                    if(victim) {
+                        victim.isAlive = false;
+                        msg += `${victim.name} WAS ELIMINATED.`;
+                    }
+                }
+            } else {
+                msg += "NO CASUALTIES.";
+            }
+
+            if(checkWin()) return;
+            
+            // Show alert then start day
+            broadcastAlert(msg);
+            setTimeout(() => runPhase('day'), 3000);
+        }
+
+        function resolveDayResults() {
+            // Tally Votes
+            let counts = {};
+            Object.values(gameState.actions.votes).forEach(t => counts[t] = (counts[t] || 0) + 1);
+            
+            let max = 0, victimId = null;
+            for(let id in counts) {
+                if(counts[id] > max) { max = counts[id]; victimId = id; }
+            }
+
+            let msg = "VOTE INCONCLUSIVE.";
+            if(victimId && max > 1) {
+                const v = players.find(p => p.id === victimId);
+                v.isAlive = false;
+                msg = `${v.name} WAS EJECTED.`;
+            }
+
+            if(checkWin()) return;
+
+            broadcastAlert(msg);
+            gameState.dayCount++;
+            setTimeout(() => runPhase('mafia_turn'), 3000);
+        }
+
+        function checkWin() {
+            const m = players.filter(p => p.isAlive && p.role === 'Mafia').length;
+            const v = players.filter(p => p.isAlive && p.role !== 'Mafia').length;
+            if(m === 0) { endGame("SECTOR SECURE: VILLAGERS WIN"); return true; }
+            if(m >= v) { endGame("SECTOR LOST: MAFIA WINS"); return true; }
+            return false;
+        }
+
+        function endGame(msg) {
+            if(hostInterval) clearInterval(hostInterval);
+            broadcastAlert(msg);
+            broadcastState("GAME OVER");
+        }
+
+        function broadcastState(statusMsg) {
+            const pubPlayers = players.map(p => ({ id: p.id, name: p.name, isAlive: p.isAlive }));
             const payload = {
                 type: 'state',
-                players: publicPlayers,
+                players: pubPlayers,
                 phase: gameState.phase,
                 timer: gameState.timer,
                 day: gameState.dayCount,
-                alert: alertMsg
+                status: statusMsg
             };
             
-            // Update Host UI
-            updateGameUI(payload, players.find(p=>p.id===myId).role);
-            if(alertMsg) showAlert(alertMsg);
-
+            updateGameUI(payload, players.find(p => p.id === myId).role);
+            
             connections.forEach(c => {
                 const p = players.find(x => x.id === c.peer);
                 c.send({ ...payload, myRole: p ? p.role : 'Spectator' });
             });
-        }
-
-        function broadcastTimer() {
-            const data = { type: 'timer', time: gameState.timer };
-            updateTimerUI(gameState.timer);
-            connections.forEach(c => c.send(data));
         }
 
         function broadcastAlert(msg) {
@@ -531,17 +448,17 @@
             connections.forEach(c => c.send({ type: 'alert', msg }));
         }
 
-        function broadcastChat(name, msg) {
-            const data = { type: 'chat', name, msg };
-            addLog(name, msg);
-            connections.forEach(c => c.send(data));
+        function broadcastTimer() {
+            const payload = { type: 'timer', time: gameState.timer };
+            updateTimer(gameState.timer);
+            connections.forEach(c => c.send(payload));
         }
 
-        function sendPrivate(targetId, msg) {
-            if(targetId === myId) showAlert(msg);
+        function sendPrivate(targetId, data) {
+            if(targetId === myId) handlePrivateData(data);
             else {
                 const c = connections.find(x => x.peer === targetId);
-                if(c) c.send({ type: 'alert', msg });
+                if(c) c.send(data);
             }
         }
 
@@ -554,7 +471,7 @@
             initPeer((id) => {
                 conn = peer.connect(hostId);
                 conn.on('open', () => {
-                    document.getElementById('menu-status').innerText = "UPLINK SECURE.";
+                    document.getElementById('menu-status').innerText = "CONNECTED";
                     conn.send({ type: 'join', name: myName });
                 });
                 conn.on('data', data => {
@@ -564,109 +481,152 @@
                             document.getElementById('screen-game').classList.remove('hidden');
                         }
                         updateGameUI(data, data.myRole);
-                        if(data.alert) showAlert(data.alert);
                     }
-                    else if (data.type === 'timer') updateTimerUI(data.time);
+                    else if (data.type === 'timer') updateTimer(data.time);
                     else if (data.type === 'alert') showAlert(data.msg);
-                    else if (data.type === 'chat') addLog(data.name, data.msg);
+                    else if (data.type === 'intel') handleIntel(data);
                 });
             });
         }
 
-        // --- RENDERER ---
-        let selectedTarget = null;
+        function handlePrivateData(data) {
+            if(data.type === 'intel') handleIntel(data);
+            if(data.type === 'alert') showAlert(data.msg);
+        }
 
-        function updateGameUI(state, myRole) {
+        function handleIntel(data) {
+            // Update local memory
+            intelMap[data.targetId] = data.status;
+            renderIntelList();
+        }
+
+        // --- UI RENDERER ---
+        function updateGameUI(state, role) {
+            myRole = role;
             document.getElementById('day-counter').innerText = `CYCLE ${state.day}`;
-            document.getElementById('role-badge').innerText = myRole;
+            document.getElementById('role-badge').innerText = role;
             document.getElementById('phase-display').innerText = state.phase.toUpperCase();
-            updateTimerUI(state.timer);
+            updateTimer(state.timer);
 
-            // Render Circular Layout
+            // Determine if it's my turn
+            const amAlive = state.players.find(p => p.id === myId)?.isAlive;
+            let myTurn = false;
+            if(amAlive) {
+                if(state.phase === 'mafia_turn' && role === 'Mafia') myTurn = true;
+                if(state.phase === 'detective_turn' && role === 'Detective') myTurn = true;
+                if(state.phase === 'doctor_turn' && role === 'Doctor') myTurn = true;
+                if(state.phase === 'day') myTurn = true;
+            }
+
+            // Button visibility
+            const btn = document.getElementById('confirm-btn');
+            if(myTurn) {
+                btn.style.display = 'block';
+                btn.innerText = (state.phase === 'day') ? "VOTE" : "ENGAGE";
+            } else {
+                btn.style.display = 'none';
+                selectedTarget = null; // Reset selection if turn ended
+            }
+
+            // Render Orbit
             const orbit = document.getElementById('orbit-container');
             orbit.innerHTML = '';
-            
             const total = state.players.length;
-            const radius = 150; // Distance from center (px) - mobile friendly approx
             
-            state.players.forEach((p, index) => {
-                // Math for circle
-                const angle = (index / total) * 2 * Math.PI - (Math.PI/2); // Start at top
-                const x = 50 + (35 * Math.cos(angle)); // % units for responsiveness
-                const y = 50 + (35 * Math.sin(angle));
+            // Build Intel Map default if empty
+            if(Object.keys(intelMap).length === 0) {
+                state.players.forEach(p => intelMap[p.id] = "?");
+            }
+
+            state.players.forEach((p, i) => {
+                const angle = (i / total) * 2 * Math.PI - (Math.PI/2);
+                const x = 50 + (38 * Math.cos(angle));
+                const y = 45 + (38 * Math.sin(angle));
                 
-                const node = document.createElement('div');
-                node.className = `player-node ${p.isAlive ? 'alive' : 'dead'} ${selectedTarget === p.id ? 'selected' : ''}`;
-                node.style.left = `${x}%`;
-                node.style.top = `${y}%`;
+                const div = document.createElement('div');
+                div.className = `player-node ${p.isAlive ? 'alive' : 'dead'} ${selectedTarget === p.id ? 'selected' : ''}`;
+                div.style.left = `${x}%`;
+                div.style.top = `${y}%`;
+                div.onclick = () => { if(myTurn && p.isAlive) selectTarget(p.id); };
                 
-                node.innerHTML = `
-                    <div class="node-circle" onclick="clickPlayer('${p.id}', ${p.isAlive})">
-                        ${p.name.charAt(0).toUpperCase()}
-                    </div>
+                div.innerHTML = `
+                    <div class="node-circle">${p.name[0]}</div>
                     <div class="node-name">${p.name}</div>
                 `;
-                orbit.appendChild(node);
+                orbit.appendChild(div);
+            });
+
+            // Intel List (Sheriff Only)
+            const intelPanel = document.getElementById('intel-panel');
+            if(role === 'Detective' && amAlive) {
+                intelPanel.style.display = 'block';
+                // Update names in map in case of join
+                state.players.forEach(p => { if(!intelMap[p.id]) intelMap[p.id] = "?"; });
+                renderIntelList(state.players);
+            } else {
+                intelPanel.style.display = 'none';
+            }
+        }
+
+        function renderIntelList(playersList) {
+            // Need the full list of players to map names to IDs
+            if(!playersList) return; // Wait for next update
+            
+            const list = document.getElementById('intel-list');
+            list.innerHTML = '';
+            
+            playersList.forEach(p => {
+                if(p.id === myId) return; // Don't show self
+                const status = intelMap[p.id] || "?";
+                const colorClass = status === 'MAFIA' ? 'status-mafia' : (status === 'INNOCENT' ? 'status-innocent' : 'status-unknown');
+                
+                const row = document.createElement('div');
+                row.className = 'intel-row';
+                row.innerHTML = `<span>${p.name}</span> <span class="${colorClass}">${status}</span>`;
+                list.appendChild(row);
             });
         }
 
-        function updateTimerUI(time) {
-            document.getElementById('timer-display').innerText = time;
-            if(time <= 5) document.getElementById('timer-display').style.color = "var(--neon-red)";
-            else document.getElementById('timer-display').style.color = "#fff";
-        }
-
-        function clickPlayer(id, isAlive) {
-            if(!isAlive) return;
+        function selectTarget(id) {
             selectedTarget = id;
-            // Visual Update locally immediately
             document.querySelectorAll('.player-node').forEach(el => el.classList.remove('selected'));
-            // This is a dirty hack to re-highlight without waiting for server, relies on DOM structure
-            // In production, use React/Vue. Here we just wait for next tick or user interaction.
-            // But let's send the action immediately.
-            submitAction(id);
+            // Find specific element (using click event visual update mostly)
+            // Force redraw logic is inside updateGameUI, but for instant feedback:
+            // We just wait for user to press button.
+            // Highlight locally:
+            const nodes = document.getElementById('orbit-container').children;
+            // Iterate to find matching
+             // Simplified: just wait for server update or trust the confirm button visual
         }
 
-        function submitAction(targetId) {
-            if(isHost) handleGameAction(myId, targetId);
-            else conn.send({ type: 'action', payload: targetId });
+        function confirmAction() {
+            if(!selectedTarget) { showAlert("SELECT TARGET FIRST"); return; }
             
-            // Highlight visually (simple way)
-            // Note: In a real app we'd wait for state update, but here we want instant feedback
+            if(isHost) processAction(myId, selectedTarget);
+            else conn.send({ type: 'action', targetId: selectedTarget });
+
+            document.getElementById('confirm-btn').style.display = 'none'; // Hide after click
+            showAlert("COMMAND SENT");
         }
 
-        // --- CHAT & UTILS ---
-        function sendChat() {
-            const input = document.getElementById('chat-input');
-            const msg = input.value.trim();
-            if(!msg) return;
-            
-            if(isHost) broadcastChat(myName, msg);
-            else conn.send({ type: 'chat', name: myName, msg: msg });
-            
-            input.value = "";
-        }
-
-        function addLog(name, msg) {
-            const log = document.getElementById('chat-log');
-            const entry = document.createElement('div');
-            entry.className = 'chat-msg';
-            entry.innerHTML = `<span style="color:var(--neon-green)">${name}:</span> ${msg}`;
-            log.appendChild(entry);
-            log.scrollTop = log.scrollHeight;
+        function updateTimer(t) {
+            const el = document.getElementById('timer-display');
+            el.innerText = t;
+            el.style.color = (t <= 5) ? 'var(--neon-red)' : '#fff';
         }
 
         function showAlert(msg) {
             const el = document.getElementById('alert-overlay');
             el.innerText = msg;
             el.style.opacity = 1;
-            setTimeout(() => el.style.opacity = 0, 4000);
+            setTimeout(() => el.style.opacity = 0, 3000);
         }
 
         function copyId() {
-            const txt = document.getElementById('lobby-id').innerText;
-            navigator.clipboard.writeText(txt).then(() => alert("ID COPIED"));
+            navigator.clipboard.writeText(document.getElementById('lobby-id').innerText);
+            alert("ID COPIED");
         }
+
     </script>
 </body>
 </html>
